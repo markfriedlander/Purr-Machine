@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support — Purr Machine</title>
+  <meta name="description" content="How to use Purr Machine — getting started, the sleep timer, the lock screen, the three cats, troubleshooting, contact.">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <link rel="icon" type="image/png" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --text: #e8dcc8;
+      --muted: #8a8275;
+      --accent: #d4b8a0;
+      --accent-glow: #e8d0b8;
+      --border: #2a2520;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.75;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 6%,
+                        rgba(212, 184, 160, 0.05) 0%,
+                        rgba(212, 184, 160, 0.00) 60%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    main { max-width: 640px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 3rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 13px;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow:
+        0 0 24px rgba(212, 184, 160, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    .brand-icon img { width: 100%; height: 100%; display: block; }
+
+    .brand-text { flex: 1; }
+
+    .app-name {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    .app-name a { color: inherit; text-decoration: none; }
+    .app-name a:hover { color: var(--accent-glow); }
+
+    h1 {
+      font-size: 1.9rem;
+      font-weight: 300;
+      color: var(--text);
+      line-height: 1.15;
+    }
+
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p { margin-bottom: 1.25rem; color: var(--text); }
+
+    /* ---- Em-dash bulleted list (troubleshooting) ---- */
+    ul {
+      margin: 0 0 1.25rem 0;
+      padding: 0;
+      list-style: none;
+    }
+    ul li {
+      padding: 0.6rem 0 0.6rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      position: relative;
+    }
+    ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+    }
+    ul li:last-child { border-bottom: none; }
+
+    strong { color: var(--text); font-weight: 500; }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s ease; }
+    a:hover { color: var(--accent-glow); text-decoration: underline; }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--accent); }
+
+    @media (max-width: 480px) {
+      body { padding: 2rem 1rem 4rem; }
+      header { gap: 0.85rem; }
+      .brand-icon { width: 48px; height: 48px; border-radius: 11px; }
+      h1 { font-size: 1.55rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <main>
+
+    <header>
+      <div class="brand-icon">
+        <img src="assets/purr-icon-256.png" alt="Purr Machine icon">
+      </div>
+      <div class="brand-text">
+        <p class="app-name"><a href="index.html">Purr Machine</a></p>
+        <h1>Support</h1>
+      </div>
+    </header>
+
+    <h2>What is Purr Machine?</h2>
+
+    <p>Purr Machine simulates the physical comfort of a cat purring on your
+    chest. Three buttons play recordings of three real cats — Floozy, Nacho,
+    and No-No! — paired with haptic patterns on the iPhone's Taptic engine.</p>
+
+    <h2>Getting Started</h2>
+
+    <p>Place the phone on your chest. Tap any of the three kitten names. The
+    app plays that cat's recording and drives a synchronized haptic. Tap the
+    same name again to stop, or tap a different name to switch cats.</p>
+
+    <h2>The Three Cats</h2>
+
+    <p>Each cat has their own distinct purr, breath rhythm, and heart rate,
+    drawn from their actual recording. <strong>Floozy</strong> was a
+    long-haired tortoiseshell with striking green eyes.
+    <strong>Nacho</strong> is a sleek orange tabby with a small white tag.
+    <strong>No-No!</strong> was a grey tabby who wore a pearl necklace.</p>
+
+    <h2>Sleep Timer</h2>
+
+    <p>Tap the bottom button (∞ by default) to cycle between 10 minutes, 20
+    minutes, 30 minutes, and infinite. When the selected time runs out,
+    audio and haptics stop together.</p>
+
+    <h2>Lock Screen</h2>
+
+    <p>When the screen locks, the audio continues so you can fall asleep
+    listening. iOS does not permit custom haptics with the screen locked —
+    the haptic stops on lock and resumes the instant you unlock and look at
+    the phone.</p>
+
+    <h2>Troubleshooting</h2>
+
+    <ul>
+      <li><strong>Volume seems low:</strong> check that the side mute switch
+      isn't engaged, and use the volume buttons during playback.</li>
+
+      <li><strong>Haptics aren't felt:</strong> the iPhone's Taptic engine
+      requires iPhone 8 or later. Confirm that Settings → Sounds &amp;
+      Haptics → System Haptics is on.</li>
+
+      <li><strong>Haptics don't resume after unlock:</strong> they should be
+      automatic. If they don't, tap the kitten name to restart playback.</li>
+
+      <li><strong>The loop is audible:</strong> the seam between loop
+      iterations is processed to be inaudible, but very quiet rooms can
+      reveal it. Try a slightly louder volume.</li>
+    </ul>
+
+    <h2>Contact</h2>
+
+    <p>
+      Mark Friedlander<br>
+      <a href="mailto:markfriedlander@yahoo.com">markfriedlander@yahoo.com</a>
+    </p>
+
+    <footer>
+      <p>Purr Machine 1.0 — May 2026 &nbsp;·&nbsp;
+         <a href="privacy.html">Privacy</a> &nbsp;·&nbsp;
+         <a href="index.html">Home</a> &nbsp;·&nbsp;
+         © 2026 Mark Friedlander</p>
+    </footer>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purr Machine — A purring cat for your chest.</title>
+  <meta name="description" content="Purr Machine simulates the physical comfort of a cat purring on your chest. Three real cats. Their actual recordings. Their own measured rhythms on the iPhone's Taptic engine.">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <link rel="icon" type="image/png" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+  <meta property="og:title" content="Purr Machine">
+  <meta property="og:description" content="A purring cat for your chest.">
+  <meta property="og:image" content="assets/purr-icon-512.png">
+  <meta property="og:url" content="https://markfriedlander.github.io/Purr-Machine/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #161412;
+      --text: #e8dcc8;
+      --muted: #8a8275;
+      --accent: #d4b8a0;
+      --accent-glow: #e8d0b8;
+      --border: #2a2520;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 18px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Very subtle pearl wash from the top — picks up the icon's
+       cream-on-black palette and extends it into the page. Stays
+       quiet so the typography carries the page. */
+    body {
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 6%,
+                        rgba(212, 184, 160, 0.06) 0%,
+                        rgba(212, 184, 160, 0.00) 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem 5rem;
+    }
+
+    /* ---- Hero ---- */
+    .hero {
+      text-align: center;
+      padding: 2rem 0 3rem;
+    }
+
+    .hero-icon {
+      display: inline-block;
+      width: 160px;
+      height: 160px;
+      border-radius: 36px;                  /* iOS app-icon mask radius (~22.5%) */
+      overflow: hidden;
+      margin-bottom: 2rem;
+      box-shadow:
+        0 0 60px rgba(212, 184, 160, 0.15),
+        0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+    .hero-icon img { width: 100%; height: 100%; display: block; }
+
+    .wordmark {
+      font-size: 2.5rem;
+      font-weight: 300;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+    }
+
+    .tagline {
+      font-size: 1.1rem;
+      font-weight: 300;
+      color: var(--accent);
+      letter-spacing: 0.01em;
+    }
+
+    /* ---- Lead paragraph ---- */
+    .lead {
+      font-size: 1.15rem;
+      line-height: 1.7;
+      text-align: center;
+      color: var(--text);
+      max-width: 32rem;
+      margin: 0 auto 3.5rem;
+      font-weight: 300;
+    }
+
+    /* ---- Feature grid ---- */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin: 3rem 0;
+    }
+
+    @media (max-width: 540px) {
+      .features { grid-template-columns: 1fr; }
+    }
+
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.4rem 1.25rem;
+    }
+
+    .feature h3 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.005em;
+    }
+
+    .feature p {
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.55;
+      margin: 0;
+      font-weight: 300;
+    }
+
+    /* ---- Closing pull-quote ---- */
+    .closing {
+      text-align: center;
+      margin: 4rem 0 2rem;
+      padding: 2.5rem 1rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .closing p {
+      font-size: 1.25rem;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--text);
+      letter-spacing: 0.005em;
+    }
+
+    /* ---- Section title ---- */
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    a:hover { color: var(--accent-glow); text-decoration: underline; }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 2rem;
+      margin: 1rem 0 0;
+      list-style: none;
+    }
+    .links li { font-size: 1.05rem; }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <main>
+
+    <section class="hero">
+      <div class="hero-icon">
+        <img src="assets/purr-icon-512.png"
+             alt="Purr Machine app icon — a meditating cat in lotus position, white silhouette on black.">
+      </div>
+      <h1 class="wordmark">Purr Machine</h1>
+      <p class="tagline">A purring cat for your chest.</p>
+    </section>
+
+    <p class="lead">
+      Three real cats. Their actual recordings, looped seamlessly and layered
+      with haptic patterns drawn from each cat's own measured rhythm. Lie down.
+      Put the phone on your chest. Close your eyes.
+    </p>
+
+    <section class="features">
+
+      <div class="feature">
+        <h3>Three real cats</h3>
+        <p>Floozy, Nacho, and No-No!. The recordings are the actual cats —
+        every breath, every bell jingle.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Their own rhythms</h3>
+        <p>Each cat's haptic pulses at the breath cycle measured from their
+        own recording. Nacho's is Nacho's.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Layered haptics</h3>
+        <p>A continuous purr modulated by breath, with a subtle heartbeat
+        underneath. Two patterns on the Taptic engine, at once.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Sleep timer</h3>
+        <p>Ten, twenty, thirty minutes — or ∞. Fall asleep to a purring cat
+        and the app turns itself off.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Plays under lock</h3>
+        <p>Audio continues when the screen sleeps. Haptics resume the moment
+        you wake the phone.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Yours, on your device</h3>
+        <p>No subscription. No account. No analytics. No servers. Free.</p>
+      </div>
+
+    </section>
+
+    <div class="closing">
+      <p>For Floozy, Nacho, and No-No!, and those who love them!</p>
+    </div>
+
+    <h2>More</h2>
+    <ul class="links">
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="support.html">Support</a></li>
+      <li><a href="mailto:markfriedlander@yahoo.com">Contact</a></li>
+    </ul>
+
+    <footer>
+      <p>Purr Machine 1.0 &nbsp;·&nbsp; iPhone &nbsp;·&nbsp; © 2026 Mark Friedlander</p>
+    </footer>
+
+  </main>
+
+</body>
+</html>

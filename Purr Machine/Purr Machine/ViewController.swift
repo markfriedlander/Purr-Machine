@@ -273,7 +273,13 @@ extension ViewController {
             title = "\(seconds / 60) min"
         }
         if timerButton.title(for: .normal) != title {
-            timerButton.setTitle(title, for: .normal)
+            // UIButton(type: .system) cross-fades title changes by default,
+            // which reads as a 1-Hz flash during the countdown. Suppress
+            // the implicit animation just for this update.
+            UIView.performWithoutAnimation {
+                timerButton.setTitle(title, for: .normal)
+                timerButton.layoutIfNeeded()
+            }
         }
     }
 }
