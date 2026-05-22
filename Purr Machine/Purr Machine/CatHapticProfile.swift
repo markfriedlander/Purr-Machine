@@ -85,14 +85,16 @@ extension CatHapticProfile {
     static var researchDefaults: CatHapticProfile {
         CatHapticProfile(
             breathPeriodSec:    3.5,
-            breathDepth:        0.25,
-            purrBaseIntensity:  0.70,
+            breathDepth:        0.55,    // bumped from 0.25 — Phase B feedback:
+                                         // "rhythm is hard to feel"
+            purrBaseIntensity:  0.85,    // bumped from 0.70 — Phase B feedback:
+                                         // "too subtle"
             purrSharpness:      0.15,
             purrSliceCount:     4,
             heartRateBPM:       160,
             s1s2SplitSec:       0.080,
-            s1Intensity:        0.40,
-            s2Intensity:        0.25,
+            s1Intensity:        0.55,    // bumped from 0.40 — Phase B feedback
+            s2Intensity:        0.35,    // bumped from 0.25
             s1Sharpness:        0.40,
             s2Sharpness:        0.60
         )
@@ -102,20 +104,20 @@ extension CatHapticProfile {
     /// about each cat. Floozy was a long-haired tortoiseshell (larger, slower
     /// heart, denser purr). Nacho is a sleek young orange tabby (lighter,
     /// faster heart). No-No! was at end of life with cancer (gentler, mid-
-    /// rate). These will be tuned in Phase B when Mark feels them.
+    /// rate). Values bumped in Phase B (2026-05-22) after Mark's first feel.
     static func defaultFor(_ kitten: Kitten) -> CatHapticProfile {
         var p = researchDefaults
         switch kitten {
         case .floozy:
-            p.purrBaseIntensity = 0.75   // richer
+            p.purrBaseIntensity = 0.90   // richer
             p.purrSharpness     = 0.12   // softer
             p.heartRateBPM      = 145
         case .nacho:
-            p.purrBaseIntensity = 0.65   // lighter
+            p.purrBaseIntensity = 0.80   // lighter
             p.purrSharpness     = 0.18   // brighter
             p.heartRateBPM      = 170
         case .noNo:
-            p.purrBaseIntensity = 0.60   // gentle
+            p.purrBaseIntensity = 0.76   // gentle — Mark's favorite, smaller bump
             p.purrSharpness     = 0.14
             p.heartRateBPM      = 155
         }
@@ -131,7 +133,7 @@ extension CatHapticProfile {
     /// autocorrelation search band (2-5 s). The depth range is wider than
     /// what we actually use for haptic modulation — see below.
     private static let kBreathPeriodRange: ClosedRange<Double> = 2.0...5.0
-    private static let kHapticDepthMaxFromAudio: Float = 0.35
+    private static let kHapticDepthMaxFromAudio: Float = 0.55
 
     /// Merge an analysis result with the per-kitten default. The measured
     /// breath PERIOD is plugged in directly (this is the architectural

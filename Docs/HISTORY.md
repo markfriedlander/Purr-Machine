@@ -4,6 +4,47 @@
 
 ---
 
+## 2026-05-22 — Phase B feedback round 1: intensity bump + audio processing
+
+Mark felt the haptic for the first time. Report: "felt pretty great! relaxing and bringing up all kinds of happy memories." No-No!'s is the favorite — partly the better audio quality of her recording, partly her bell jingling, which is preserved and irreplaceable. All three were "a little more subtle" than he wanted, and rhythm changes were "hard to feel."
+
+### Haptic intensity bumps (across all three cats)
+| field             | before | after |
+|-------------------|-------:|------:|
+| Floozy intensity  | 0.75   | 0.90  |
+| Nacho intensity   | 0.65   | 0.80  |
+| No-No! intensity  | 0.60   | 0.76  | (smaller bump — already the favorite)
+| breath depth cap  | 0.35   | 0.55  |
+| heartbeat S1      | 0.40   | 0.55  |
+| heartbeat S2      | 0.25   | 0.35  |
+
+The 0.55 depth cap means trough = (1 - 0.55) × baseIntensity → about 0.4 of peak. That's a meaningful felt swell-and-recede rather than the previous 0.65-of-peak whisper.
+
+### Audio production pipeline (Scripts/process_audio.sh)
+New per-file pipeline using ffmpeg on Mark's Mac, written so it's easy to re-run when sources change:
+
+1. **highpass 28 Hz** — strips room rumble below the purr fundamental. All three cats purr at ~28-29 Hz (per our analysis), so the cutoff is just below their voice.
+2. **adeclick** — isolates and patches transient pops/clicks (mic bumps from movement). Broader sounds like sheets rustling are preserved because they're not point-spikes.
+3. **dynaudnorm** — smooths the volume swings from us moving the mic closer/farther, without flattening the cat's actual dynamics. This is what Mark asked for ("sounds like we're capturing better").
+4. **loudnorm to -18 LUFS** — consistent perceived loudness across all three cats.
+5. **Seamless loop crossfade** — last 0.5s fades into a copy of the first 0.5s. When AVAudioPlayer loops the file, the seam is silent — no click.
+6. **AAC encode @ 96 kbps** — matches source format, in-ear quality.
+
+Originals in `Audio kitty purrs/` are **never written to**. Production files at `Purr Machine/Purr[123].m4a`.
+
+### What was deliberately not touched
+- No-No!'s bell jingling. It's HIM.
+- Sheets / fabric / kitten-bumping-into-mic sounds. They're the room he was in.
+- Underlying recording fidelity. What was captured is the ceiling.
+
+### One snag along the way
+First processing pass wrote the files to `Purr Machine/Purr Machine/Purr*.m4a` (the inner synchronized folder). The pbxproj has explicit `PBXFileReference`s for `Purr Machine/Purr*.m4a` at the project root, AND the synchronized folder auto-included the inner copies, so the build saw duplicate resources and failed. Moved the files to the project root and added a comment in the script so this doesn't happen again.
+
+### Verification on processed audio
+Autocorrelation on the new files gives the same per-cat rhythms (28.6-28.9 Hz purr, 2.1-3.3 s breath cycles). The processing didn't damage the rhythm content. All three kittens still bring up both purr+heartbeat players cleanly.
+
+---
+
 ## 2026-05-22 — Haptic Phase A.2: CC's tuning judgment before handoff to Mark
 
 SC pushed back: stop deferring tuning judgment calls to Mark. Wear all three hats yourself. Don't bring Mark in until you think it's ready. Made the following changes on my own judgment, all with the goal of "cat on chest" not "phone alert":

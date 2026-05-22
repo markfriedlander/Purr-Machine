@@ -42,11 +42,12 @@ Purr Machine makes your iPhone feel like a purring cat lying on your chest. Thre
 - **AppState extraction**: ViewController is now a thin view over `AppState.shared`. UI behavior unchanged.
 - **Bundled audio**: corrected — Floozy/Nacho/No-No! now each play their own real recording (see HISTORY.md 2026-05-21).
 - **Haptic Phase A**: two-player architecture (purr+breathing as one looped player with parameter curve; heartbeat as a second looped player). Per-cat breath cycles measured from each recording via autocorrelation. Engine kept warm. API extended (named players, loop, schema reconciliation). All Phase A QA passed. See HISTORY.md 2026-05-22.
+- **Phase B round 1**: Mark felt the haptic — "felt pretty great! relaxing and bringing up all kinds of happy memories." Bumped intensities and breath depth across the board on his feedback that it was "too subtle." See HISTORY.md 2026-05-22 (Phase B round 1).
+- **Audio production pipeline** (`Scripts/process_audio.sh`): ffmpeg-based; declick, dynaudnorm (volume smoothing), loudness normalization, seamless loop crossfade. Originals untouched in `Audio kitty purrs/`; production files at `Purr Machine/Purr[123].m4a`. The bell jingle, fabric sounds, and other "imperfections" Mark called out are preserved.
 
 ## What Is Not Done (in priority order)
 
-1. **Mark listens to confirm No-No! take #2 is the right recording** (vs #1 or #3)
-2. **Haptic Phase B — tuning with Mark on chest.** Drive `/haptics/dynamic` + `/haptics/pattern` live based on Mark's feedback. No haptic commit without his confirmation.
+1. **Phase B round 2** — Mark feels the bumped-intensity, processed-audio version. Iterate from there.
 3. **Haptic pattern design** — written design reviewed by Mark before code
 4. **Layered haptic implementation** — purr + breathing + heartbeat simultaneously
 5. **Audio loop verification** — check for click artifacts at loop points
