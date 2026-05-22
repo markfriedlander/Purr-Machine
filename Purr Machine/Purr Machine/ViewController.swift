@@ -22,6 +22,11 @@ class ViewController: UIViewController {
     private var timerButton: UIButton!
     private var kittenButtons: [UIButton] = []
 
+    #if DEBUG
+    private var apiToggleButton: UIButton!
+    private var didAutoStartAPI = false
+    #endif
+
     /// Maps a button tag to the corresponding Kitten case. Tags 1/2/3 == raw values.
     private func kitten(for tag: Int) -> Kitten? { Kitten(rawValue: tag) }
 }
@@ -39,6 +44,16 @@ extension ViewController {
             name: AppState.didChange, object: nil
         )
         refreshFromState()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        #if DEBUG
+        if !didAutoStartAPI {
+            didAutoStartAPI = true
+            startAPIAndShowInfo(showAlert: true)
+        }
+        #endif
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -95,9 +110,76 @@ extension ViewController {
             mainStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             mainStackView.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40),
         ])
+
+        #if DEBUG
+        buildAPIToggleButton()
+        #endif
     }
 }
 // ========== BLOCK 3: ViewController - UI construction - END ==========
+
+// ========== BLOCK 6: ViewController - DEBUG API toggle - START ==========
+#if DEBUG
+extension ViewController {
+
+    private func buildAPIToggleButton() {
+        let b = UIButton(type: .system)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        b.setImage(UIImage(systemName: "antenna.radiowaves.left.and.right", withConfiguration: cfg), for: .normal)
+        b.tintColor = .white.withAlphaComponent(0.25)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.addTarget(self, action: #selector(apiToggleTapped), for: .touchUpInside)
+        b.accessibilityLabel = "API toggle"
+        view.addSubview(b)
+        NSLayoutConstraint.activate([
+            b.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+            b.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            b.widthAnchor.constraint(equalToConstant: 44),
+            b.heightAnchor.constraint(equalToConstant: 44),
+        ])
+        apiToggleButton = b
+        refreshAPIToggleAppearance()
+    }
+
+    @objc private func apiToggleTapped() {
+        let server = LocalAPIServer.shared
+        if server.isRunning {
+            server.stop()
+        } else {
+            startAPIAndShowInfo(showAlert: true)
+        }
+        refreshAPIToggleAppearance()
+    }
+
+    fileprivate func startAPIAndShowInfo(showAlert: Bool) {
+        let server = LocalAPIServer.shared
+        if !server.isRunning { server.start() }
+        let info = server.connectionInfo
+        print("PurrAPI(VC): \(info)")
+        UIPasteboard.general.string = info
+        refreshAPIToggleAppearance()
+        guard showAlert else { return }
+        let alert = UIAlertController(
+            title: "API ready",
+            message: "Address (also copied to clipboard):\n\n\(info)",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Copy again", style: .default) { _ in
+            UIPasteboard.general.string = info
+        })
+        alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    private func refreshAPIToggleAppearance() {
+        guard let b = apiToggleButton else { return }
+        b.tintColor = LocalAPIServer.shared.isRunning
+            ? .white
+            : .white.withAlphaComponent(0.25)
+    }
+}
+#endif
+// ========== BLOCK 6: ViewController - DEBUG API toggle - END ==========
 
 // ========== BLOCK 4: ViewController - actions - START ==========
 extension ViewController {

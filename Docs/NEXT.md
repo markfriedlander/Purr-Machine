@@ -27,21 +27,17 @@ Project has working v0 code in a single `ViewController.swift`. Core loop functi
 
 ## Immediate Next Steps — In Order
 
-### Step 1 — Establish the API (First Priority) ✅ code complete, device verify pending
+### Step 1 — Establish the API ✅ DONE (verified on Mark's iPhone 16 Plus, 2026-05-21)
 
-Implemented as `LocalAPIServer` on port **8767**. Bearer-token auth (Keychain-persisted, generated on first launch). Shared state extracted into `AppState`.
+Verified end-to-end over USB at `169.254.x.x:8767`:
+- `/health` 200 (no auth); `/state` 401 without token, 200 with; state matches UI
+- `/kitten/select {"name":"Nacho"}` flipped the on-screen button bold and started audio
+- `/haptics/pattern` with parameter curves successfully drove an arbitrary CHHapticPattern (felt on device)
+- `/timer/cycle`, `/timer/set` worked
 
-API surface (full table in HISTORY.md 2026-05-21):
-- GET  /health, /state
-- POST /kitten/select, /play, /stop
-- POST /timer/cycle, /timer/set
-- POST /haptics/pattern (arbitrary CHHapticPattern), /haptics/dynamic, /haptics/stop
+Connection details in CLAUDE.md (Build + Deploy and API connection sections). DEBUG-only antenna toggle in the top-left of the UI; alert on first launch shows the connection string.
 
-Still to do for Step 1:
-1. Mark runs `xcrun devicectl list devices` → share UDID
-2. Install Debug build on iPhone, confirm token + address print to console and land on pasteboard
-3. CC curls each endpoint, confirms state matches what's on screen
-4. Once verified, fill in device UDID + connection cheat-sheet in CLAUDE.md
+**Known v0 bug surfaced by the API**: `hapticsActive` returns `false` after `/play`, but `currentHapticIntensity` is updating. This means the v0 audio-sync timer fires but the haptic player itself never comes up cleanly. Confirmed pre-existing behavior — the haptic redesign in Step 3 is meant to replace this entirely.
 
 ### Step 2 — Research Phase (Before Writing Haptic Code)
 
@@ -89,6 +85,23 @@ Refactor into clearly bounded blocks before the file grows further. Do not chang
 - Version bump
 - Clean Release build (zero warnings)
 - Archive + submit
+
+---
+
+## Pre-haptic-research items worth doing soon
+
+### Bundled audio files are wrong — all three kittens play the same (non-Nacho, non-Floozy, non-No-No!) recording
+
+Confirmed via sha256 (2026-05-21): `Purr1.m4a` / `Purr2.m4a` / `Purr3.m4a` in the bundle are byte-identical to each other (325 KB, dated March 2025) and don't match **any** file in `Audio kitty purrs/`. The real per-cat recordings are:
+- Floozy → `Audio kitty purrs/Floozy.m4a` (922 KB)
+- Nacho  → `Audio kitty purrs/Nacho.m4a` (700 KB)
+- No-No! → one of `No-No! 1.m4a` / `No-No! 2.m4a` / `No-No! 3.m4a` (CC will tentatively use #2; Mark to confirm by listening)
+
+This is the kind of bug that gut-punches the user experience — Nacho should sound like Nacho. Should be fixed before haptic research begins so the per-kitten haptic patterns can be tuned against the right audio.
+
+### iPad app-icon warnings (pre-existing)
+
+Asset compilation emits two warnings about missing 76x76@2x and 83.5x83.5@2x iPad icons. Not fixed in the API PR per CLAUDE.md ("App icon: complete"). Options: add the missing slot images, or mark the app iPhone-only (`TARGETED_DEVICE_FAMILY = "1"`).
 
 ---
 

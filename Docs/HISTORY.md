@@ -38,7 +38,23 @@ First CC session on the project. Read the doc set, studied the Hal Universal `Lo
 | POST | /haptics/stop     | stop haptics only |
 
 ### Verification
-Clean Release build, zero warnings introduced. Two pre-existing iPad app-icon warnings (76x76@2x, 83.5x83.5@2x missing) noted — not touched per CLAUDE.md ("App icon: complete"). Device install + endpoint verification deferred until Mark provides the UDID.
+Clean Release build, zero warnings introduced. Two pre-existing iPad app-icon warnings (76x76@2x, 83.5x83.5@2x missing) noted — not touched per CLAUDE.md ("App icon: complete").
+
+Verified end-to-end on Mark's iPhone 16 Plus (UDID `D24FB384-9C55-5D33-9B0D-DAEBFA6528D6`) over USB at `169.254.x.x:8767`:
+- `/health` 200 no-auth; `/state` 401 without token, 200 with; state matched UI
+- `/kitten/select {"name":"Nacho"}` updated UI + started audio
+- `/haptics/pattern` drove an arbitrary CHHapticPattern with parameter curve — felt on device, `hapticsActive=true`, `hapticDrivenByAudioSync=false`
+- `/timer/cycle`, `/timer/set`, `/stop` worked
+
+A second DEBUG-only commit followed the first API commit, adding the antenna-toggle pattern from Posey:
+- Top-left antenna icon in the UI (DEBUG only) toggles the API on/off
+- Auto-start on first `viewDidAppear` shows an `API ready` alert with `<ip>:<port>:<token>`, also copied to clipboard
+- `LocalAPIServer` writes `api_connection.txt` to `Documents/` on start (useful on simulator)
+- `LocalAPIServer.shared` singleton; SceneDelegate no longer owns startup
+
+### Surfaced bugs (not fixed in this session — see NEXT.md)
+1. **Bundled audio**: `Purr1/Purr2/Purr3.m4a` are byte-identical (325 KB) and don't match any file in `Audio kitty purrs/`. All three kittens play the same wrong recording.
+2. **v0 haptic startup is racy**: `/state` reports `hapticsActive=false` after `/play`, even though `currentHapticIntensity` is updating. The audio-sync timer fires; the haptic player itself never comes up cleanly. This is the exact problem the haptic redesign is meant to fix.
 
 ### Decisions worth preserving
 - Port **8767** assigned to Purr Machine (Posey 8765, Hal 8766).

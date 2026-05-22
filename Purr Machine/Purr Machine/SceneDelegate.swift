@@ -7,19 +7,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
 
-    /// Process-wide LocalAPIServer. One instance per app launch.
-    private static let api: LocalAPIServer = {
-        let s = LocalAPIServer()
-        s.start()
-        return s
-    }()
-
     func scene(_ scene: UIScene,
                willConnectTo session: UISceneSession,
                options connectionOptions: UIScene.ConnectionOptions) {
         guard let _ = (scene as? UIWindowScene) else { return }
-        _ = SceneDelegate.api  // touch the lazy var so the server starts on first scene
-        _ = AppState.shared    // prime AppState before any API call lands
+        _ = AppState.shared  // prime AppState before any API call lands
+        // LocalAPIServer is started by ViewController so the connection-info
+        // alert can be presented from a view that's actually on-screen.
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}

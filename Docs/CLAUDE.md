@@ -148,24 +148,31 @@ Maximum ~100 lines per block. Optimal 50–75. This enables surgical edits and p
 ## Build + Deploy
 
 ```bash
+UDID=D24FB384-9C55-5D33-9B0D-DAEBFA6528D6  # Marks Bigger Ass Fon 16 (iPhone 16 Plus)
+BUNDLE=com.HeatherAndMark.PurrMachine.Purr-Machine
+APP="/Users/markfriedlander/Library/Developer/Xcode/DerivedData/Purr_Machine-edtcccgcejbmwqalejieopgfdtud/Build/Products/Debug-iphoneos/Purr Machine.app"
+
 # Build
 xcodebuild build \
-  -project "/Users/markfriedlander/Desktop/Fun/Purr Machine/Purr Machine.xcodeproj" \
+  -project "/Users/markfriedlander/Desktop/Fun/Purr Machine/Purr Machine/Purr Machine.xcodeproj" \
   -scheme "Purr Machine" \
-  -destination "id=<DEVICE_UDID>" \
+  -destination "id=$UDID" \
   -configuration Debug
 
 # Install
-xcrun devicectl device install app --device <DEVICE_UDID> \
-  "<DERIVED_DATA_PATH>/Build/Products/Debug-iphoneos/Purr Machine.app"
+xcrun devicectl device install app --device $UDID "$APP"
 
 # Launch
-xcrun devicectl device process launch --device <DEVICE_UDID> com.MarkFriedlander.PurrMachine
+xcrun devicectl device process launch --device $UDID $BUNDLE
 ```
 
-Device UDID — to be filled in once Mark runs `xcrun devicectl list devices` and identifies the iPhone.
+After launch, the app shows an "API ready" alert with `<ip>:8767:<token>` (DEBUG builds only) and also copies it to the clipboard. Tap the antenna icon in the top-left to toggle the API on/off.
+
+Device UDID for Mark's iPhone 16 Plus ("Marks Bigger Ass Fon 16"): `D24FB384-9C55-5D33-9B0D-DAEBFA6528D6`.
 
 Bundle ID for install/launch is `com.HeatherAndMark.PurrMachine.Purr-Machine` (note: not `com.MarkFriedlander.*` — confirmed from pbxproj).
+
+Reachable over USB at the phone's link-local IP (typically `169.254.x.x`) — read it from the alert dialog the app shows on launch, or from the `antenna.radiowaves` button in the top-left corner of the app.
 
 ## API connection
 

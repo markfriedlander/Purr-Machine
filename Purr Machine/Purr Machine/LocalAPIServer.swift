@@ -35,11 +35,21 @@ import CoreHaptics
 // ========== BLOCK 1: LocalAPIServer - lifecycle + token + address - START ==========
 final class LocalAPIServer {
 
+    /// Process-wide singleton. The toolbar antenna toggle, SceneDelegate, and
+    /// API handlers all reach the same instance through `.shared`.
+    static let shared = LocalAPIServer()
+
     static let apiPort: UInt16 = 8767
 
     private var listener: NWListener?
 
     var isRunning: Bool { listener != nil }
+
+    /// Synthesized at any time from local IP + port + Keychain token. Safe to
+    /// read before the listener reaches `.ready` — we know the values up front.
+    var connectionInfo: String {
+        "\(Self.localIPAddress()):\(Self.apiPort):\(Self.loadOrCreateToken())"
+    }
 
     // --- Token storage (Keychain) ---
     private static let keychainService = "com.HeatherAndMark.PurrMachine"
@@ -107,11 +117,11 @@ final class LocalAPIServer {
             l.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    let token = Self.loadOrCreateToken()
-                    let address = "\(LocalAPIServer.localIPAddress()):\(LocalAPIServer.apiPort)"
-                    print("PurrAPI: Ready at \(address) token:\(token)")
+                    let info = self.connectionInfo
+                    print("PurrAPI: Ready — \(info)")
                     DispatchQueue.main.async {
-                        UIPasteboard.general.string = "\(address):\(token)"
+                        UIPasteboard.general.string = info
+                        Self.writeConnectionFile(info)
                     }
                 case .failed(let e):
                     print("PurrAPI: Failed — \(e)")
@@ -130,6 +140,18 @@ final class LocalAPIServer {
         listener?.cancel()
         listener = nil
         print("PurrAPI: Stopped")
+    }
+
+    /// Write the connection info to `Documents/api_connection.txt`. On the
+    /// iOS Simulator this file is readable from the Mac at
+    ///   ~/Library/Developer/CoreSimulator/Devices/<UDID>/data/Containers/Data/Application/<APP>/Documents/api_connection.txt
+    /// On a physical device the file is sandboxed; the alert + clipboard
+    /// remain the developer-facing surfaces there.
+    private static func writeConnectionFile(_ info: String) {
+        guard let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask).first else { return }
+        let url = docs.appendingPathComponent("api_connection.txt")
+        try? info.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 }
 // ========== BLOCK 1: LocalAPIServer - lifecycle + token + address - END ==========
