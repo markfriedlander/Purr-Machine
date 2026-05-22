@@ -23,10 +23,11 @@ Purr Machine makes your iPhone feel like a purring cat lying on your chest. Thre
 **Main file:** `ViewController.swift` — single file, all logic  
 **API:** Not yet established (first priority for CC)
 
-**Device:** To be filled in once API is set up  
-**API host:** TBD  
-**API port:** TBD  
-**API token:** TBD  
+**Device:** Pending — Mark to share UDID via `xcrun devicectl list devices`
+**API host:** the iPhone's local Wi-Fi IP (printed by the app on launch)
+**API port:** 8767
+**API token:** generated on first launch, persisted in Keychain, printed/pasteboarded on every launch
+**Bundle ID:** `com.HeatherAndMark.PurrMachine.Purr-Machine`
 
 ---
 
@@ -34,13 +35,15 @@ Purr Machine makes your iPhone feel like a purring cat lying on your chest. Thre
 
 - v0 code: working audio playback, basic haptics, sleep timer, kitten selection
 - App icon: complete (meditating cat in lotus position)
-- GitHub repo: created
-- Document system: established (this session)
+- GitHub repo: created and connected (two commits on `origin/main`)
+- Document system: established
 - Strategy: agreed (see HISTORY.md 2026-05-21)
+- **LocalAPIServer**: built, port 8767, code complete (see HISTORY.md 2026-05-21). Device verification pending.
+- **AppState extraction**: ViewController is now a thin view over `AppState.shared`. UI behavior unchanged.
 
 ## What Is Not Done (in priority order)
 
-1. **API** — build first, before anything else
+1. **API device verification** — install on iPhone, curl each endpoint, confirm state matches UI
 2. **Haptic research** — cat physiology + CoreHaptics capabilities
 3. **Haptic pattern design** — written design reviewed by Mark before code
 4. **Layered haptic implementation** — purr + breathing + heartbeat simultaneously

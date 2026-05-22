@@ -17,29 +17,31 @@ Project has working v0 code in a single `ViewController.swift`. Core loop functi
 **What's not working yet:**
 - Haptics don't feel like a cat — single continuous buzz, no rhythm, stops/restarts every 0.25s causing stutter
 - No layered rhythms (purr + breathing + heartbeat)
-- API not yet established — CC cannot interact with the app
 - Audio loops may have click artifacts at loop points (not yet verified)
-- No LEGO block structure in ViewController.swift yet
+- ViewController has LEGO block structure now; the rest of the app does not yet (only AppState + LocalAPIServer + ViewController are blocked)
+
+**Now working:**
+- LocalAPIServer on port 8767 — full API for read/control, including arbitrary CHHapticPattern submission. State extracted into `AppState` (single source of truth). UI behavior unchanged.
 
 ---
 
 ## Immediate Next Steps — In Order
 
-### Step 1 — Establish the API (First Priority)
+### Step 1 — Establish the API (First Priority) ✅ code complete, device verify pending
 
-Before any feature work. The API is a first-class citizen.
+Implemented as `LocalAPIServer` on port **8767**. Bearer-token auth (Keychain-persisted, generated on first launch). Shared state extracted into `AppState`.
 
-CC needs to be able to:
-- Query: which kitten is selected, is audio playing, current timer state, haptic active/inactive
-- Trigger: select a kitten, play/stop, cycle timer
-- Observe: haptic intensity values in real time
+API surface (full table in HISTORY.md 2026-05-21):
+- GET  /health, /state
+- POST /kitten/select, /play, /stop
+- POST /timer/cycle, /timer/set
+- POST /haptics/pattern (arbitrary CHHapticPattern), /haptics/dynamic, /haptics/stop
 
-Action items:
-1. Design the API surface (verbs + responses) — discuss with Mark first
-2. Implement a lightweight HTTP server in the app (similar pattern to Hal/Posey)
-3. Establish device UDID, API host/port, token
-4. Update CLAUDE.md with connection details
-5. Verify CC can trigger each kitten and read state back
+Still to do for Step 1:
+1. Mark runs `xcrun devicectl list devices` → share UDID
+2. Install Debug build on iPhone, confirm token + address print to console and land on pasteboard
+3. CC curls each endpoint, confirms state matches what's on screen
+4. Once verified, fill in device UDID + connection cheat-sheet in CLAUDE.md
 
 ### Step 2 — Research Phase (Before Writing Haptic Code)
 

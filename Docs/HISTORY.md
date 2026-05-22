@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-05-21 — LocalAPIServer Established (Step 1 of NEXT.md)
+
+### Context
+First CC session on the project. Read the doc set, studied the Hal Universal `LocalAPIServer` pattern, agreed an API surface with Mark, then executed.
+
+### Git
+- Initialized local repo (was not yet a git checkout)
+- First commit: v0 state (`ViewController.swift`, audio, app icon, docs, source recordings)
+- Merged the GitHub auto-generated README on top (unrelated histories, single merge commit)
+- Second commit: AppState + LocalAPIServer + Info.plist + ViewController refactor
+- Pushed to `origin/main`
+
+### Code changes
+- **AppState.swift (new)** — `@MainActor` single source of truth. Owns audio player, haptic engine, sleep timer, kitten selection. ViewController is now a thin view over it. v0 haptic behavior preserved byte-for-byte (the redesign comes in Step 2/3).
+- **LocalAPIServer.swift (new)** — `NWListener` HTTP/JSON server on port **8767**. Bearer-token auth (Keychain-persisted). Token + address printed to console and copied to pasteboard on launch.
+- **ViewController.swift** — refactored to use AppState. Behavior identical for the user.
+- **SceneDelegate.swift** — starts the API server on first scene attach.
+- **Info.plist** — added `NSLocalNetworkUsageDescription` and `NSBonjourServices`.
+
+### API surface (port 8767, all but /health require Bearer token)
+| Method | Path | Purpose |
+|---|---|---|
+| GET  | /health           | liveness (no auth) |
+| GET  | /state            | full snapshot |
+| POST | /kitten/select    | `{name}` or `{tag}`; toggles like a tap |
+| POST | /play             | start playback |
+| POST | /stop             | stop |
+| POST | /timer/cycle      | same as tapping timer button |
+| POST | /timer/set        | `{index}` or `{seconds}` |
+| POST | /haptics/pattern  | full arbitrary CHHapticPattern |
+| POST | /haptics/dynamic  | live `intensity`/`sharpness` via `CHHapticDynamicParameter` |
+| POST | /haptics/stop     | stop haptics only |
+
+### Verification
+Clean Release build, zero warnings introduced. Two pre-existing iPad app-icon warnings (76x76@2x, 83.5x83.5@2x missing) noted — not touched per CLAUDE.md ("App icon: complete"). Device install + endpoint verification deferred until Mark provides the UDID.
+
+### Decisions worth preserving
+- Port **8767** assigned to Purr Machine (Posey 8765, Hal 8766).
+- `/haptics/pattern` accepts arbitrary patterns including parameter curves and dynamic parameters — maximum flexibility for the haptic-design iteration loop.
+- Two-commit history (v0, then API) gives a clean before/after.
+
+---
+
 ## 2026-05-21 — Project Restarted; Strategy Session with Claude (claude.ai)
 
 ### Context

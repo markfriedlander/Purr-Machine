@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Purr Machine exposes a local HTTP API on your Wi-Fi network so a developer (or Claude Code) on the same network can read app state and trigger haptic patterns during development.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_purrmachine._tcp</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -163,7 +163,50 @@ xcrun devicectl device install app --device <DEVICE_UDID> \
 xcrun devicectl device process launch --device <DEVICE_UDID> com.MarkFriedlander.PurrMachine
 ```
 
-Device UDID and API details to be filled in once API is established — update this file when they are known.
+Device UDID — to be filled in once Mark runs `xcrun devicectl list devices` and identifies the iPhone.
+
+Bundle ID for install/launch is `com.HeatherAndMark.PurrMachine.Purr-Machine` (note: not `com.MarkFriedlander.*` — confirmed from pbxproj).
+
+## API connection
+
+Purr Machine runs a `LocalAPIServer` on **port 8767** (family convention: Posey 8765, Hal 8766, PurrMachine 8767). On launch the app prints `<ip>:8767:<token>` to the console and copies the same string to the system pasteboard. The token is generated on first launch and persisted in the Keychain — it does not change across launches unless the app is uninstalled.
+
+All endpoints except `/health` require `Authorization: Bearer <token>`. Body is JSON; responses are JSON. Mutating endpoints return the new `/state` snapshot.
+
+```bash
+# Configure once per session
+HOST=<phone-ip>
+TOKEN=<token>
+H="Authorization: Bearer $TOKEN"
+
+# Read
+curl http://$HOST:8767/health
+curl -H "$H" http://$HOST:8767/state | jq
+
+# Control
+curl -H "$H" -d '{"name":"Floozy"}' http://$HOST:8767/kitten/select
+curl -H "$H" -X POST http://$HOST:8767/stop
+curl -H "$H" -d '{"seconds":600}'   http://$HOST:8767/timer/set
+curl -H "$H" -X POST http://$HOST:8767/timer/cycle
+
+# Haptics — submit an arbitrary CHHapticPattern
+curl -H "$H" -d '{
+  "events":[
+    {"time":0.0,"duration":1.0,"type":"continuous","intensity":0.6,"sharpness":0.2},
+    {"time":1.0,"duration":1.0,"type":"continuous","intensity":0.3,"sharpness":0.2}
+  ],
+  "parameterCurves":[
+    {"parameter":"HapticIntensityControl","time":0,
+     "controlPoints":[{"time":0,"value":0.0},{"time":1.0,"value":1.0},{"time":2.0,"value":0.0}]}
+  ]
+}' http://$HOST:8767/haptics/pattern
+
+# Live tweak the currently running player (no stop/restart)
+curl -H "$H" -d '{"intensity":0.5,"sharpness":0.3}' http://$HOST:8767/haptics/dynamic
+curl -H "$H" -X POST http://$HOST:8767/haptics/stop
+```
+
+Event fields accepted by `/haptics/pattern`: `type` (`continuous`/`transient`), `time`, `duration`, `intensity`, `sharpness`, `attackTime`, `decayTime`, `releaseTime`, `sustained`. Parameter curves and dynamic parameters use Apple's standard IDs: `HapticIntensityControl`, `HapticSharpnessControl`, `HapticAttackTimeControl`, `HapticDecayTimeControl`, `HapticReleaseTimeControl`.
 
 ---
 
