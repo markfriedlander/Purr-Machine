@@ -82,11 +82,19 @@ final class LocalAPIServer {
     private var apiToken: String { Self.loadOrCreateToken() }
 
     // --- Local Wi-Fi IP discovery ---
+    //
+    // Prefers `en0` (iPhone Wi-Fi) over any other `en*` interface, and prefers
+    // a real routable IP (10/8, 172.16/12, 192.168/16) over a link-local
+    // (169.254/16) address. The link-local block is what iOS hands out for
+    // its USB-Ethernet tether to the Mac — we want to advertise the Wi-Fi
+    // address so the API is reachable from any host on the LAN, not just the
+    // Mac via cable.
     static func localIPAddress() -> String {
-        var best = "127.0.0.1"
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0 else { return best }
+        guard getifaddrs(&ifaddr) == 0 else { return "127.0.0.1" }
         defer { freeifaddrs(ifaddr) }
+
+        var candidates: [(name: String, ip: String)] = []
         var ptr = ifaddr
         while let iface = ptr?.pointee {
             defer { ptr = ptr?.pointee.ifa_next }
@@ -97,9 +105,21 @@ final class LocalAPIServer {
             getnameinfo(iface.ifa_addr, socklen_t(iface.ifa_addr.pointee.sa_len),
                         &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
             let ip = String(cString: hostname)
-            if !ip.isEmpty && ip != "0.0.0.0" { best = ip }
+            guard !ip.isEmpty, ip != "0.0.0.0" else { continue }
+            candidates.append((name, ip))
         }
-        return best
+
+        func score(_ c: (name: String, ip: String)) -> Int {
+            var s = 0
+            if c.name == "en0"            { s += 100 }       // Wi-Fi on iPhone
+            if !c.ip.hasPrefix("169.254") { s += 50  }       // routable beats link-local
+            if c.ip.hasPrefix("192.168")
+               || c.ip.hasPrefix("10.")
+               || c.ip.hasPrefix("172.")  { s += 10  }
+            return s
+        }
+
+        return candidates.max(by: { score($0) < score($1) })?.ip ?? "127.0.0.1"
     }
 
     var connectionURL: String { "\(Self.localIPAddress()):\(Self.apiPort)" }
