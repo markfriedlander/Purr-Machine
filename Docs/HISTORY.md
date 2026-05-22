@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-05-21 — Bundled audio corrected; Wi-Fi IP discovery fixed
+
+### Wrong-audio bug fixed
+The bundled `Purr1/Purr2/Purr3.m4a` files were byte-identical to each other and didn't match any of the real recordings — every kitten button played the same wrong recording. Replaced them in place with the real takes from `Audio kitty purrs/`:
+
+| Kitten  | Source file in `Audio kitty purrs/` | Size  | Duration |
+|---------|-------------------------------------|-------|----------|
+| Floozy  | `Floozy.m4a`                        | 922 KB| 110.9 s  |
+| Nacho   | `Nacho.m4a`                         | 700 KB| 80.3 s   |
+| No-No!  | `No-No! 2.m4a`                      | 529 KB| 65.6 s   |
+
+For No-No! there were three candidate takes; CC picked #2 (the middle take by size). Mark to verify by listening; trivial to swap to #1 or #3 if a different take feels better. The "Floozy test.m4a" and "Floozy.m4a" source files are byte-identical, so "test" is redundant (left in place, not in the bundle).
+
+Verified via API by playing each kitten and reading `audioDuration` — three distinct values, all matching the source files.
+
+### Wi-Fi IP discovery
+`LocalAPIServer.localIPAddress()` previously took the last `en*` interface it iterated, which on a USB-tethered iPhone resolved to the 169.254/16 link-local address — only reachable from the host Mac via cable. New scoring prefers `en0` (iPhone Wi-Fi), then any non-link-local address, then RFC1918 ranges. Verified over Wi-Fi alone (cable unplugged): `192.168.12.206:8767` reachable from the Mac.
+
+---
+
 ## 2026-05-21 — LocalAPIServer Established (Step 1 of NEXT.md)
 
 ### Context

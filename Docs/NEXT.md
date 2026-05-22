@@ -90,14 +90,12 @@ Refactor into clearly bounded blocks before the file grows further. Do not chang
 
 ## Pre-haptic-research items worth doing soon
 
-### Bundled audio files are wrong — all three kittens play the same (non-Nacho, non-Floozy, non-No-No!) recording
-
-Confirmed via sha256 (2026-05-21): `Purr1.m4a` / `Purr2.m4a` / `Purr3.m4a` in the bundle are byte-identical to each other (325 KB, dated March 2025) and don't match **any** file in `Audio kitty purrs/`. The real per-cat recordings are:
-- Floozy → `Audio kitty purrs/Floozy.m4a` (922 KB)
-- Nacho  → `Audio kitty purrs/Nacho.m4a` (700 KB)
-- No-No! → one of `No-No! 1.m4a` / `No-No! 2.m4a` / `No-No! 3.m4a` (CC will tentatively use #2; Mark to confirm by listening)
-
-This is the kind of bug that gut-punches the user experience — Nacho should sound like Nacho. Should be fixed before haptic research begins so the per-kitten haptic patterns can be tuned against the right audio.
+### Bundled audio files ✅ FIXED 2026-05-21
+Replaced bundled `Purr1/Purr2/Purr3.m4a` with the real recordings from `Audio kitty purrs/`:
+- Floozy → Floozy.m4a (922 KB, ~110.9 s)
+- Nacho  → Nacho.m4a (700 KB, ~80.3 s)
+- No-No! → No-No! 2.m4a (529 KB, ~65.6 s)  ← Mark to confirm this is the right take by listening
+Verified via API: distinct `audioDuration` per kitten.
 
 ### iPad app-icon warnings (pre-existing)
 
