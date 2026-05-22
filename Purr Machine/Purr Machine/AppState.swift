@@ -9,9 +9,25 @@
 // AVAudioSession are touched only on the main thread. The HTTP server hops
 // onto MainActor when it needs to read state or invoke an action.
 //
-// IMPORTANT: This file extracts existing v0 behavior verbatim. The known-broken
-// v0 haptic (stop/restart every 0.25s) is preserved as-is — its redesign is the
-// next phase per Docs/NEXT.md. Do not change haptic behavior in this file.
+// Haptic architecture (Phase A, 2026-05-22):
+//
+//   * Engine is started once and kept warm (isAutoShutdownEnabled = false).
+//     A stoppedHandler / resetHandler pair recovers from system events;
+//     no stop/restart "to refresh" dance like the v0 code did.
+//
+//   * Two named looped players run simultaneously when a kitten is playing:
+//     "purr"      — continuous events sliced over one breath cycle, with a
+//                   CHHapticParameterCurve baking the inhale/exhale envelope
+//                   straight into the pattern (no timer-driven updates).
+//     "heartbeat" — transient lub-dub pair, looped at the cat's heart rate.
+//
+//   * A third "api" player slot is reserved for arbitrary patterns submitted
+//     via /haptics/pattern (the Phase B tuning surface).
+//
+//   * Per-kitten parameters come from CatHapticProfile, which is built from
+//     CatAudioAnalysis (run once at launch) merged with research defaults.
+//     Floozy's haptic pulses at Floozy's measured rhythm; Nacho at Nacho's;
+//     No-No! at No-No!'s. That is the architectural commitment.
 
 import Foundation
 import AVFoundation
@@ -53,14 +69,14 @@ enum Kitten: Int, CaseIterable {
 }
 // ========== BLOCK 1: Kitten model - END ==========
 
-// ========== BLOCK 2: AppState - properties & observers - START ==========
+// ========== BLOCK 2: AppState - properties & init - START ==========
 @MainActor
 final class AppState {
 
     static let shared = AppState()
 
-    /// Posted whenever observable state changes (selection, play/stop, timer tick).
-    /// ViewController listens for this to refresh button styling and timer label.
+    /// Posted whenever observable state changes (selection, play/stop, timer
+    /// tick, analysis completion). ViewController listens for this.
     static let didChange = Notification.Name("com.HeatherAndMark.PurrMachine.AppState.didChange")
 
     // --- Selection / playback ---
@@ -80,36 +96,66 @@ final class AppState {
     var audioDuration: TimeInterval { audioPlayer?.duration ?? 0 }
     var isPlaying: Bool { audioPlayer?.isPlaying ?? false }
 
+    // --- Audio analysis + per-kitten profiles ---
+    private(set) var audioAnalysisByKitten: [Kitten: CatAudioAnalysis] = [:]
+    private(set) var profilesByKitten: [Kitten: CatHapticProfile] = [:]
+
+    /// Resolves the profile for a kitten, falling back to research defaults
+    /// until analysis completes (early in launch).
+    func profile(for k: Kitten) -> CatHapticProfile {
+        profilesByKitten[k] ?? .researchDefaults
+    }
+
     // --- Haptics ---
-    private var hapticsEngine: CHHapticEngine?
-    private var hapticPlayer: CHHapticAdvancedPatternPlayer?
-    private var hapticSyncTimer: Timer?
-    private(set) var hapticsActive: Bool = false
-    private(set) var currentHapticIntensity: Float = 0.0
-    private(set) var currentHapticSharpness: Float = 0.2
     var hapticsSupported: Bool { CHHapticEngine.capabilitiesForHardware().supportsHaptics }
 
-    /// Tracks whether the live haptic pattern is being driven by the v0 audio-sync
-    /// timer (true) or by an API-supplied pattern (false). Used so the API can
-    /// take over haptic control without the audio-sync timer fighting it back.
-    private(set) var hapticDrivenByAudioSync: Bool = true
+    private var hapticsEngine: CHHapticEngine?
+    private var engineStartedAt: Date?
+
+    /// Three named player slots — see file header. Each may be nil when not
+    /// in use. The API addresses these by name.
+    private var purrPlayer:      CHHapticAdvancedPatternPlayer?
+    private var heartbeatPlayer: CHHapticAdvancedPatternPlayer?
+    private var apiPlayer:       CHHapticAdvancedPatternPlayer?
+
+    /// True if any player is currently active.
+    var hapticsActive: Bool {
+        purrPlayer != nil || heartbeatPlayer != nil || apiPlayer != nil
+    }
+
+    /// Last seen intensity/sharpness values applied through the API. Useful
+    /// telemetry for Phase B tuning. Note: these reflect the most-recent
+    /// /haptics/dynamic update; they are NOT a continuous readback of the
+    /// engine's live output (Apple doesn't expose that).
+    private(set) var currentHapticIntensity: Float = 0.0
+    private(set) var currentHapticSharpness: Float = 0.2
+
+    /// Names of currently-running players, in stable order. Used by /state
+    /// and /haptics/players.
+    var activePlayerNames: [String] {
+        var names: [String] = []
+        if purrPlayer      != nil { names.append("purr")      }
+        if heartbeatPlayer != nil { names.append("heartbeat") }
+        if apiPlayer       != nil { names.append("api")       }
+        return names
+    }
 
     private init() {
-        setupHapticEngineIfPossible()
+        bootstrapHapticEngine()
+        kickOffAudioAnalysis()
     }
 
     private func notifyChange() {
         NotificationCenter.default.post(name: AppState.didChange, object: self)
     }
 }
-// ========== BLOCK 2: AppState - properties & observers - END ==========
+// ========== BLOCK 2: AppState - properties & init - END ==========
 
 // ========== BLOCK 3: AppState - playback actions - START ==========
 extension AppState {
 
-    /// Mirrors a tap on a kitten button: toggle off if already playing, otherwise
-    /// stop any current playback and start this kitten. Preserves v0 behavior
-    /// including the timer reset on switching between kittens.
+    /// Mirrors a tap on a kitten button: toggle off if already playing,
+    /// otherwise stop any current playback and start this kitten.
     func toggle(_ kitten: Kitten) {
         if currentlyPlaying == kitten {
             stop()
@@ -159,11 +205,9 @@ extension AppState {
         isTimerPaused = true
         countdownTimer?.invalidate()
         countdownTimer = nil
-        hapticSyncTimer?.invalidate()
-        hapticSyncTimer = nil
         audioPlayer?.stop()
         audioPlayer = nil
-        stopHapticsInternal()
+        stopAllHapticPlayersInternal()
         if resetTimerUI && timerOptions[timerIndex] > 0 {
             remainingTime = 0
         }
@@ -181,7 +225,7 @@ extension AppState {
             player.numberOfLoops = -1
             player.play()
             audioPlayer = player
-            startAudioSyncedHapticsInternal()
+            startCatHapticsInternal(for: kitten)
         } catch {
             print("AppState: error starting audio: \(error)")
         }
@@ -252,156 +296,260 @@ extension AppState {
 }
 // ========== BLOCK 4: AppState - timer actions - END ==========
 
-// ========== BLOCK 5: AppState - haptics (v0 behavior preserved) - START ==========
+// ========== BLOCK 5: AppState - haptic engine lifecycle - START ==========
 extension AppState {
 
-    private func setupHapticEngineIfPossible() {
+    /// Create the engine, install handlers, and start it. Called once from
+    /// init and on demand if the engine has gone away. The engine is kept
+    /// warm — we never call `engine.stop` ourselves.
+    fileprivate func bootstrapHapticEngine() {
         guard hapticsSupported else {
             print("AppState: haptics not supported on this device")
             return
         }
+        if hapticsEngine != nil { return }
         do {
-            hapticsEngine = try CHHapticEngine()
-            try hapticsEngine?.start()
-        } catch {
-            print("AppState: haptic engine failed to start: \(error)")
-        }
-    }
+            let engine = try CHHapticEngine()
+            engine.isAutoShutdownEnabled = false
+            engine.playsHapticsOnly = true
 
-    /// Drives the v0 haptic-follows-audio behavior. KNOWN BROKEN — preserved
-    /// verbatim so the user-visible behavior is unchanged. Redesign happens
-    /// in the haptic-research phase (NEXT.md Step 2/3).
-    private func startAudioSyncedHapticsInternal() {
-        hapticDrivenByAudioSync = true
-        startHapticPurringInternal()
-        guard let player = audioPlayer else { return }
-        let totalDuration = player.duration
-        let interval = totalDuration / 2
-        hapticSyncTimer?.invalidate()
-        hapticSyncTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] timer in
-            guard let self else { timer.invalidate(); return }
-            Task { @MainActor in
-                guard self.hapticDrivenByAudioSync, let p = self.audioPlayer else {
-                    timer.invalidate()
-                    return
-                }
-                let t = p.currentTime
-                if t < interval {
-                    self.currentHapticIntensity = Float(t / interval) * 0.6
-                } else {
-                    self.currentHapticIntensity = 0.6 - Float((t - interval) / interval) * 0.3
-                }
-                self.updateHapticsIntensityInternal()
-                if t >= totalDuration {
-                    timer.invalidate()
-                    self.hapticSyncTimer = nil
+            engine.stoppedHandler = { reason in
+                print("AppState: haptic engine stopped — reason=\(reason.rawValue)")
+                Task { @MainActor in
+                    AppState.shared.handleEngineStopped()
                 }
             }
+            engine.resetHandler = {
+                print("AppState: haptic engine reset — rebuilding")
+                Task { @MainActor in
+                    AppState.shared.handleEngineReset()
+                }
+            }
+
+            try engine.start()
+            hapticsEngine = engine
+            engineStartedAt = Date()
+        } catch {
+            print("AppState: haptic engine bootstrap failed: \(error)")
         }
     }
 
-    private func startHapticPurringInternal() {
-        guard hapticsSupported else { return }
-        if hapticsEngine == nil { setupHapticEngineIfPossible() }
-        guard let engine = hapticsEngine else { return }
-        engine.stop { _ in
-            do {
-                try engine.start()
-                Task { @MainActor in self.playInitialHapticPatternInternal() }
-            } catch {
-                print("AppState: haptic engine restart failed: \(error)")
+    /// Returns the engine, recreating it if needed. Returns nil only on
+    /// unsupported hardware or unrecoverable failure.
+    fileprivate func liveEngine() -> CHHapticEngine? {
+        if hapticsEngine == nil { bootstrapHapticEngine() }
+        // Defensive: re-call start() even if the engine exists. CHHapticEngine.start()
+        // is a no-op when already running and recovers a stopped engine.
+        if let e = hapticsEngine {
+            do { try e.start() } catch {
+                print("AppState: engine.start() recovery failed: \(error)")
+                hapticsEngine = nil
+                bootstrapHapticEngine()
             }
         }
+        return hapticsEngine
     }
 
-    private func playInitialHapticPatternInternal() {
-        guard let engine = hapticsEngine else { return }
-        do {
-            let events = [
-                CHHapticEvent(eventType: .hapticContinuous, parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)
-                ], relativeTime: 0, duration: 0.4),
-                CHHapticEvent(eventType: .hapticContinuous, parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
-                ], relativeTime: 0.4, duration: 0.3)
-            ]
-            let pattern = try CHHapticPattern(events: events, parameters: [])
-            hapticPlayer = try engine.makeAdvancedPlayer(with: pattern)
-            try hapticPlayer?.start(atTime: 0)
-            hapticsActive = true
-        } catch {
-            print("AppState: failed to play initial haptic pattern: \(error)")
-        }
-    }
-
-    private func updateHapticsIntensityInternal() {
-        guard hapticsActive, let engine = hapticsEngine else { return }
-        do {
-            let events = [
-                CHHapticEvent(eventType: .hapticContinuous, parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: currentHapticIntensity),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: currentHapticSharpness)
-                ], relativeTime: 0, duration: 0.4)
-            ]
-            let pattern = try CHHapticPattern(events: events, parameters: [])
-            if let player = hapticPlayer { try? player.stop(atTime: 0) }
-            hapticPlayer = try engine.makeAdvancedPlayer(with: pattern)
-            try hapticPlayer?.start(atTime: 0)
-        } catch {
-            print("AppState: failed to update haptic intensity: \(error)")
-        }
-    }
-
-    private func stopHapticsInternal() {
-        hapticSyncTimer?.invalidate()
-        hapticSyncTimer = nil
-        if let player = hapticPlayer { try? player.stop(atTime: 0) }
-        hapticPlayer = nil
-        hapticsEngine?.stop(completionHandler: nil)
-        hapticsActive = false
-        hapticDrivenByAudioSync = true
-    }
-}
-// ========== BLOCK 5: AppState - haptics (v0 behavior preserved) - END ==========
-
-// ========== BLOCK 6: AppState - API-driven haptics - START ==========
-extension AppState {
-
-    /// Play an arbitrary CHHapticPattern supplied via the API. Hands haptic
-    /// control off from the v0 audio-sync timer until the next playback or
-    /// /haptics/stop. Returns nothing; throws on engine/pattern errors.
-    func playAPIHapticPattern(events: [CHHapticEvent],
-                              parameterCurves: [CHHapticParameterCurve],
-                              dynamicParameters: [CHHapticDynamicParameter]) throws {
-        if hapticsEngine == nil { setupHapticEngineIfPossible() }
-        guard let engine = hapticsEngine else {
-            throw NSError(domain: "PurrMachine.API", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Haptic engine unavailable"])
-        }
-        try engine.start()
-        let pattern = try CHHapticPattern(events: events, parameterCurves: parameterCurves)
-        hapticDrivenByAudioSync = false
-        hapticSyncTimer?.invalidate()
-        hapticSyncTimer = nil
-        if let player = hapticPlayer { try? player.stop(atTime: 0) }
-        hapticPlayer = try engine.makeAdvancedPlayer(with: pattern)
-        for p in dynamicParameters {
-            try? hapticPlayer?.sendParameters([p], atTime: 0)
-        }
-        try hapticPlayer?.start(atTime: 0)
-        hapticsActive = true
+    /// Called from the engine's stoppedHandler (on a background thread, hopped
+    /// to main). Tear down the player references since they're no longer valid.
+    fileprivate func handleEngineStopped() {
+        purrPlayer      = nil
+        heartbeatPlayer = nil
+        apiPlayer       = nil
+        // Engine instance is kept; CHHapticEngine.start() will revive it on
+        // next demand.
         notifyChange()
     }
 
-    /// Send dynamic intensity/sharpness updates to the currently running
-    /// haptic player without stopping/restarting it.
-    func sendDynamicHaptic(intensity: Float?, sharpness: Float?) throws {
-        guard let player = hapticPlayer else {
-            throw NSError(domain: "PurrMachine.API", code: -2,
-                          userInfo: [NSLocalizedDescriptionKey: "No active haptic player"])
+    /// Called from the engine's resetHandler. Restart the engine and rebuild
+    /// whatever should be playing right now (if a kitten is selected).
+    fileprivate func handleEngineReset() {
+        purrPlayer      = nil
+        heartbeatPlayer = nil
+        apiPlayer       = nil
+        do {
+            try hapticsEngine?.start()
+        } catch {
+            print("AppState: engine restart after reset failed: \(error)")
+            return
         }
+        if let k = currentlyPlaying {
+            startCatHapticsInternal(for: k)
+        }
+        notifyChange()
+    }
+}
+// ========== BLOCK 5: AppState - haptic engine lifecycle - END ==========
+
+// ========== BLOCK 6: AppState - cat haptic patterns (purr + heartbeat) - START ==========
+extension AppState {
+
+    /// Build the per-kitten patterns and start both looped players. Stops
+    /// any previously-running purr/heartbeat players first. Engine recovery
+    /// is handled inside `liveEngine()`.
+    fileprivate func startCatHapticsInternal(for kitten: Kitten) {
+        stopPlayerInternal(name: "purr")
+        stopPlayerInternal(name: "heartbeat")
+        guard let engine = liveEngine() else { return }
+        let prof = profile(for: kitten)
+        do {
+            let purrPat  = try buildPurrPattern(from: prof)
+            let purr     = try engine.makeAdvancedPlayer(with: purrPat)
+            purr.loopEnabled = true
+            purr.loopEnd     = prof.breathPeriodSec
+            try purr.start(atTime: 0)
+            purrPlayer = purr
+
+            let heartPat = try buildHeartbeatPattern(from: prof)
+            let heart    = try engine.makeAdvancedPlayer(with: heartPat)
+            heart.loopEnabled = true
+            heart.loopEnd     = prof.heartCycleSec
+            try heart.start(atTime: 0)
+            heartbeatPlayer = heart
+
+            currentHapticIntensity = prof.purrBaseIntensity
+            currentHapticSharpness = prof.purrSharpness
+        } catch {
+            print("AppState: startCatHaptics failed for \(kitten.displayName): \(error)")
+        }
+        notifyChange()
+    }
+
+    /// One full breath cycle, sliced into `purrSliceCount` continuous events,
+    /// modulated by a CHHapticParameterCurve baking the inhale/exhale envelope
+    /// into the pattern.
+    fileprivate func buildPurrPattern(from prof: CatHapticProfile) throws -> CHHapticPattern {
+        let period   = prof.breathPeriodSec
+        let slices   = max(1, prof.purrSliceCount)
+        let sliceLen = period / Double(slices)
+        var events: [CHHapticEvent] = []
+        events.reserveCapacity(slices)
+        for i in 0..<slices {
+            let t = Double(i) * sliceLen
+            events.append(CHHapticEvent(
+                eventType: .hapticContinuous,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: prof.purrBaseIntensity),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: prof.purrSharpness),
+                ],
+                relativeTime: t,
+                duration: sliceLen
+            ))
+        }
+
+        // Breath envelope: starter shape per Claude's research notes —
+        //   t=0      → 0.85 (mid)
+        //   t=0.25T  → low  (deep-inhale dip)
+        //   t=0.50T  → 0.92 (rising into exhale)
+        //   t=0.75T  → 1.00 (exhale peak)
+        //   t=T      → 0.85 (return to mid)
+        // Multiplied onto the per-event intensity by the IntensityControl
+        // parameter (the run-time engine multiplies event intensity by the
+        // current control-parameter value).
+        let low: Float = max(0.05, 1.0 - prof.breathDepth)
+        let curve = CHHapticParameterCurve(
+            parameterID: .hapticIntensityControl,
+            controlPoints: [
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0,              value: 0.85),
+                CHHapticParameterCurve.ControlPoint(relativeTime: period * 0.25,  value: low),
+                CHHapticParameterCurve.ControlPoint(relativeTime: period * 0.50,  value: 0.92),
+                CHHapticParameterCurve.ControlPoint(relativeTime: period * 0.75,  value: 1.00),
+                CHHapticParameterCurve.ControlPoint(relativeTime: period,         value: 0.85),
+            ],
+            relativeTime: 0
+        )
+        return try CHHapticPattern(events: events, parameterCurves: [curve])
+    }
+
+    /// Two transient events spaced by the S1-S2 split. The player's loopEnd
+    /// is set to the full heart cycle, so the lub-dub repeats with silence
+    /// between cycles.
+    fileprivate func buildHeartbeatPattern(from prof: CatHapticProfile) throws -> CHHapticPattern {
+        let events: [CHHapticEvent] = [
+            CHHapticEvent(eventType: .hapticTransient, parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: prof.s1Intensity),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: prof.s1Sharpness),
+            ], relativeTime: 0),
+            CHHapticEvent(eventType: .hapticTransient, parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: prof.s2Intensity),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: prof.s2Sharpness),
+            ], relativeTime: prof.s1s2SplitSec),
+        ]
+        return try CHHapticPattern(events: events, parameters: [])
+    }
+}
+// ========== BLOCK 6: AppState - cat haptic patterns (purr + heartbeat) - END ==========
+
+// ========== BLOCK 7: AppState - named player ops (API surface) - START ==========
+extension AppState {
+
+    /// Stop one named player and clear its slot. No-op if already nil.
+    /// Recognizes "purr" / "heartbeat" / "api".
+    func stopPlayerInternal(name: String) {
+        switch name {
+        case "purr":
+            if let p = purrPlayer { try? p.stop(atTime: 0) }
+            purrPlayer = nil
+        case "heartbeat":
+            if let p = heartbeatPlayer { try? p.stop(atTime: 0) }
+            heartbeatPlayer = nil
+        case "api":
+            if let p = apiPlayer { try? p.stop(atTime: 0) }
+            apiPlayer = nil
+        default:
+            break
+        }
+    }
+
+    /// Stop every active player. Engine is left running.
+    func stopAllHapticPlayersInternal() {
+        stopPlayerInternal(name: "purr")
+        stopPlayerInternal(name: "heartbeat")
+        stopPlayerInternal(name: "api")
+    }
+
+    /// Stop one named player (API path: POST /haptics/stop {player}).
+    /// If `name` is nil, stop all.
+    func stopHapticPlayer(named name: String?) {
+        if let n = name {
+            stopPlayerInternal(name: n)
+        } else {
+            stopAllHapticPlayersInternal()
+        }
+        notifyChange()
+    }
+
+    /// Load and play an arbitrary pattern into a named slot. Defaults to
+    /// "api" if no slot is specified. Replaces whatever was in that slot.
+    func playAPIHapticPattern(events: [CHHapticEvent],
+                              parameterCurves: [CHHapticParameterCurve],
+                              dynamicParameters: [CHHapticDynamicParameter],
+                              loop: Bool,
+                              loopEnd: Double?,
+                              player slot: String = "api") throws {
+        guard let engine = liveEngine() else {
+            throw NSError(domain: "PurrMachine.API", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Haptic engine unavailable"])
+        }
+        let pattern = try CHHapticPattern(events: events, parameterCurves: parameterCurves)
+        let p = try engine.makeAdvancedPlayer(with: pattern)
+        p.loopEnabled = loop
+        if let le = loopEnd, le > 0 { p.loopEnd = le }
+        for dp in dynamicParameters { try? p.sendParameters([dp], atTime: 0) }
+        // Replace the named slot
+        stopPlayerInternal(name: slot)
+        try p.start(atTime: 0)
+        switch slot {
+        case "purr":      purrPlayer      = p
+        case "heartbeat": heartbeatPlayer = p
+        default:          apiPlayer       = p     // "api" or anything else
+        }
+        notifyChange()
+    }
+
+    /// Send dynamic intensity/sharpness updates. If `name` is given, sends
+    /// only to that slot. If nil, sends to every active player.
+    func sendDynamicHaptic(intensity: Float?, sharpness: Float?, player name: String?) throws {
         var params: [CHHapticDynamicParameter] = []
         if let i = intensity {
             params.append(CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: i, relativeTime: 0))
@@ -412,19 +560,76 @@ extension AppState {
             currentHapticSharpness = s
         }
         guard !params.isEmpty else { return }
-        try player.sendParameters(params, atTime: 0)
+        let targets: [CHHapticAdvancedPatternPlayer?] = {
+            if let n = name {
+                switch n {
+                case "purr":      return [purrPlayer]
+                case "heartbeat": return [heartbeatPlayer]
+                case "api":       return [apiPlayer]
+                default:          return []
+                }
+            }
+            return [purrPlayer, heartbeatPlayer, apiPlayer]
+        }()
+        let live = targets.compactMap { $0 }
+        guard !live.isEmpty else {
+            throw NSError(domain: "PurrMachine.API", code: -2,
+                          userInfo: [NSLocalizedDescriptionKey: "No active haptic player\(name.map { " for slot '\($0)'" } ?? "")"])
+        }
+        for p in live { try p.sendParameters(params, atTime: 0) }
         notifyChange()
     }
 
-    /// Stop haptics only; leaves audio playing.
+    /// Stop haptics only; audio (if any) keeps playing.
     func stopHapticsOnly() {
-        stopHapticsInternal()
+        stopAllHapticPlayersInternal()
         notifyChange()
     }
 }
-// ========== BLOCK 6: AppState - API-driven haptics - END ==========
+// ========== BLOCK 7: AppState - named player ops (API surface) - END ==========
 
-// ========== BLOCK 7: AppState - state snapshot - START ==========
+// ========== BLOCK 8: AppState - audio analysis at launch - START ==========
+extension AppState {
+
+    /// Kick off background analysis of all three bundled recordings. Results
+    /// are merged with research defaults into per-kitten haptic profiles.
+    /// Analysis is launch-time only — these files don't change at runtime.
+    fileprivate func kickOffAudioAnalysis() {
+        // Seed profiles with defaults so anything that asks before analysis
+        // completes still gets a usable answer.
+        for k in Kitten.allCases {
+            profilesByKitten[k] = .researchDefaults
+        }
+        Task.detached(priority: .userInitiated) {
+            // Sendable: enum + struct of primitives.
+            let pairs: [(Kitten, CatAudioAnalysis?)] = Kitten.allCases.map { k in
+                (k, AudioAnalyzer.analyze(resourceName: k.audioFile))
+            }
+            await MainActor.run {
+                AppState.shared.applyAnalyses(pairs)
+            }
+        }
+    }
+
+    @MainActor
+    fileprivate func applyAnalyses(_ pairs: [(Kitten, CatAudioAnalysis?)]) {
+        for (k, a) in pairs {
+            audioAnalysisByKitten[k] = a
+            profilesByKitten[k] = .from(a)
+            if let a { print("AudioAnalysis: \(a.summary)") }
+            else     { print("AudioAnalysis: [\(k.displayName)] no result — defaults") }
+        }
+        // If a kitten is already playing, rebuild patterns with the
+        // freshly-derived profile so the user feels the right rhythm.
+        if let k = currentlyPlaying {
+            startCatHapticsInternal(for: k)
+        }
+        notifyChange()
+    }
+}
+// ========== BLOCK 8: AppState - audio analysis at launch - END ==========
+
+// ========== BLOCK 9: AppState - state snapshot - START ==========
 extension AppState {
 
     /// JSON-serialisable snapshot of every observable state field. Used by
@@ -438,6 +643,27 @@ extension AppState {
         let appVersion  = info["CFBundleShortVersionString"] as? String ?? ""
         let buildNumber = info["CFBundleVersion"] as? String ?? ""
         let device      = UIDevice.current
+
+        // Per-kitten audio + profile dictionaries
+        var analyses: [[String: Any]] = []
+        var profiles: [[String: Any]] = []
+        for k in Kitten.allCases {
+            var a = audioAnalysisByKitten[k]?.dictionary() ?? [
+                "resource":          k.audioFile,
+                "durationSeconds":   NSNull(),
+                "sampleRate":        NSNull(),
+                "breathPeriodSec":   NSNull(),
+                "breathDepth":       NSNull(),
+                "purrFundamentalHz": NSNull(),
+                "analysisMillis":    NSNull(),
+            ]
+            a["kitten"] = k.displayName
+            analyses.append(a)
+            var p = profile(for: k).dictionary()
+            p["kitten"] = k.displayName
+            profiles.append(p)
+        }
+
         return [
             "selectedKittenName":      selectedKitten.displayName,
             "selectedKittenTag":       selectedKitten.rawValue,
@@ -454,9 +680,11 @@ extension AppState {
             "isTimerPaused":           isTimerPaused,
             "hapticsSupported":        hapticsSupported,
             "hapticsActive":           hapticsActive,
-            "hapticDrivenByAudioSync": hapticDrivenByAudioSync,
+            "activePlayers":           activePlayerNames,
             "currentHapticIntensity":  currentHapticIntensity,
             "currentHapticSharpness":  currentHapticSharpness,
+            "audioAnalyses":           analyses,
+            "hapticProfiles":          profiles,
             "kittens":                 kittens,
             "appVersion":              appVersion,
             "buildNumber":             buildNumber,
@@ -465,4 +693,4 @@ extension AppState {
         ]
     }
 }
-// ========== BLOCK 7: AppState - state snapshot - END ==========
+// ========== BLOCK 9: AppState - state snapshot - END ==========

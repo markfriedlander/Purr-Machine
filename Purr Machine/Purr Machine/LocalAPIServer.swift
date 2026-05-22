@@ -279,6 +279,8 @@ extension LocalAPIServer {
     fileprivate func route(_ req: ParsedRequest) async -> (Int, String) {
         switch (req.method, req.path) {
         case ("GET",  "/state"):           return await handleState()
+        case ("GET",  "/audio/analysis"):  return await handleAudioAnalysis()
+        case ("GET",  "/haptics/players"): return await handleHapticPlayers()
         case ("POST", "/kitten/select"):   return await handleKittenSelect(body: req.body)
         case ("POST", "/play"):            return await handlePlay(body: req.body)
         case ("POST", "/stop"):            return await handleStop()
@@ -286,7 +288,7 @@ extension LocalAPIServer {
         case ("POST", "/timer/set"):       return await handleTimerSet(body: req.body)
         case ("POST", "/haptics/pattern"): return await handleHapticsPattern(body: req.body)
         case ("POST", "/haptics/dynamic"): return await handleHapticsDynamic(body: req.body)
-        case ("POST", "/haptics/stop"):    return await handleHapticsStop()
+        case ("POST", "/haptics/stop"):    return await handleHapticsStop(body: req.body)
         default:                           return (404, "{\"error\":\"Not found\"}")
         }
     }
@@ -325,9 +327,43 @@ extension LocalAPIServer {
         return (200, await stateJSONString())
     }
 
-    fileprivate func handleHapticsStop() async -> (Int, String) {
-        await MainActor.run { AppState.shared.stopHapticsOnly() }
+    fileprivate func handleHapticsStop(body: Data?) async -> (Int, String) {
+        let playerName: String? = (Self.parseJSONObject(body)?["player"] as? String)
+        await MainActor.run { AppState.shared.stopHapticPlayer(named: playerName) }
         return (200, await stateJSONString())
+    }
+
+    fileprivate func handleAudioAnalysis() async -> (Int, String) {
+        let dicts: [[String: Any]] = await MainActor.run {
+            Kitten.allCases.map { k in
+                var d = AppState.shared.audioAnalysisByKitten[k]?.dictionary() ?? [
+                    "resource":          k.audioFile,
+                    "breathPeriodSec":   NSNull(),
+                    "breathDepth":       NSNull(),
+                    "purrFundamentalHz": NSNull(),
+                ]
+                d["kitten"] = k.displayName
+                var p = AppState.shared.profile(for: k).dictionary()
+                p["kitten"] = k.displayName
+                d["profile"] = p
+                return d
+            }
+        }
+        return (200, Self.serialize(["analyses": dicts]))
+    }
+
+    fileprivate func handleHapticPlayers() async -> (Int, String) {
+        let payload: [String: Any] = await MainActor.run {
+            let s = AppState.shared
+            return [
+                "supported":         s.hapticsSupported,
+                "active":            s.hapticsActive,
+                "activePlayers":     s.activePlayerNames,
+                "currentIntensity":  s.currentHapticIntensity,
+                "currentSharpness":  s.currentHapticSharpness,
+            ]
+        }
+        return (200, Self.serialize(payload))
     }
 
     fileprivate func handleKittenSelect(body: Data?) async -> (Int, String) {
@@ -402,12 +438,13 @@ extension LocalAPIServer {
         }
         let intensity = (json["intensity"] as? NSNumber).map { $0.floatValue }
         let sharpness = (json["sharpness"] as? NSNumber).map { $0.floatValue }
+        let player    = json["player"] as? String   // optional — nil = all active
         if intensity == nil && sharpness == nil {
             return (400, "{\"error\":\"Provide 'intensity' and/or 'sharpness'\"}")
         }
         do {
             try await MainActor.run {
-                try AppState.shared.sendDynamicHaptic(intensity: intensity, sharpness: sharpness)
+                try AppState.shared.sendDynamicHaptic(intensity: intensity, sharpness: sharpness, player: player)
             }
             return (200, await stateJSONString())
         } catch {
@@ -422,6 +459,9 @@ extension LocalAPIServer {
         let rawEvents  = (json["events"]  as? [[String: Any]]) ?? []
         let rawCurves  = (json["parameterCurves"] as? [[String: Any]]) ?? []
         let rawDynamic = (json["dynamicParameters"] as? [[String: Any]]) ?? []
+        let loop       = (json["loop"]    as? Bool) ?? false
+        let loopEnd    = (json["loopEnd"] as? NSNumber)?.doubleValue
+        let playerSlot = (json["player"]  as? String) ?? "api"
         let events:  [CHHapticEvent]
         let curves:  [CHHapticParameterCurve]
         let dynamic: [CHHapticDynamicParameter]
@@ -438,7 +478,8 @@ extension LocalAPIServer {
         do {
             try await MainActor.run {
                 try AppState.shared.playAPIHapticPattern(
-                    events: events, parameterCurves: curves, dynamicParameters: dynamic
+                    events: events, parameterCurves: curves, dynamicParameters: dynamic,
+                    loop: loop, loopEnd: loopEnd, player: playerSlot
                 )
             }
             return (200, await stateJSONString())
@@ -484,26 +525,25 @@ extension LocalAPIServer {
         }
     }
 
+    /// Schema reconciliation — accepts both spellings:
+    ///   parameter / parameterID
+    ///   controlPoints / keyframes
+    ///   time / relativeTime
     private static func decodeCurve(_ dict: [String: Any]) throws -> CHHapticParameterCurve {
-        guard let pStr = dict["parameter"] as? String else {
-            throw apiError("Curve missing 'parameter'")
-        }
-        let pid: CHHapticDynamicParameter.ID
-        switch pStr {
-        case "HapticIntensityControl": pid = .hapticIntensityControl
-        case "HapticSharpnessControl": pid = .hapticSharpnessControl
-        case "HapticAttackTimeControl":  pid = .hapticAttackTimeControl
-        case "HapticDecayTimeControl":   pid = .hapticDecayTimeControl
-        case "HapticReleaseTimeControl": pid = .hapticReleaseTimeControl
-        default: throw apiError("Unknown curve parameter '\(pStr)'")
-        }
-        let time = (dict["time"] as? NSNumber)?.doubleValue ?? 0
-        guard let points = dict["controlPoints"] as? [[String: Any]], !points.isEmpty else {
-            throw apiError("Curve requires non-empty 'controlPoints'")
+        let pStr = (dict["parameter"] as? String) ?? (dict["parameterID"] as? String)
+        guard let pStr else { throw apiError("Curve missing 'parameter' (or 'parameterID')") }
+        let pid = try parameterID(pStr)
+        let time = ((dict["time"] as? NSNumber) ?? (dict["relativeTime"] as? NSNumber))?.doubleValue ?? 0
+        let points = (dict["controlPoints"] as? [[String: Any]])
+                  ?? (dict["keyframes"]     as? [[String: Any]])
+                  ?? []
+        guard !points.isEmpty else {
+            throw apiError("Curve requires non-empty 'controlPoints' (or 'keyframes')")
         }
         let cps: [CHHapticParameterCurve.ControlPoint] = try points.map { p in
-            guard let t = (p["time"]  as? NSNumber)?.doubleValue,
-                  let v = (p["value"] as? NSNumber)?.floatValue else {
+            let t = ((p["time"] as? NSNumber) ?? (p["relativeTime"] as? NSNumber))?.doubleValue
+            let v = (p["value"] as? NSNumber)?.floatValue
+            guard let t, let v else {
                 throw apiError("Control point requires 'time' and 'value'")
             }
             return CHHapticParameterCurve.ControlPoint(relativeTime: t, value: v)
@@ -512,21 +552,24 @@ extension LocalAPIServer {
     }
 
     private static func decodeDynamic(_ dict: [String: Any]) throws -> CHHapticDynamicParameter {
-        guard let pStr = dict["parameter"] as? String,
-              let v = (dict["value"] as? NSNumber)?.floatValue else {
-            throw apiError("Dynamic parameter requires 'parameter' and 'value'")
+        let pStr = (dict["parameter"] as? String) ?? (dict["parameterID"] as? String)
+        guard let pStr, let v = (dict["value"] as? NSNumber)?.floatValue else {
+            throw apiError("Dynamic parameter requires 'parameter' (or 'parameterID') and 'value'")
         }
-        let time = (dict["time"] as? NSNumber)?.doubleValue ?? 0
-        let pid: CHHapticDynamicParameter.ID
-        switch pStr {
-        case "HapticIntensityControl": pid = .hapticIntensityControl
-        case "HapticSharpnessControl": pid = .hapticSharpnessControl
-        case "HapticAttackTimeControl":  pid = .hapticAttackTimeControl
-        case "HapticDecayTimeControl":   pid = .hapticDecayTimeControl
-        case "HapticReleaseTimeControl": pid = .hapticReleaseTimeControl
-        default: throw apiError("Unknown dynamic parameter '\(pStr)'")
-        }
+        let time = ((dict["time"] as? NSNumber) ?? (dict["relativeTime"] as? NSNumber))?.doubleValue ?? 0
+        let pid = try parameterID(pStr)
         return CHHapticDynamicParameter(parameterID: pid, value: v, relativeTime: time)
+    }
+
+    private static func parameterID(_ s: String) throws -> CHHapticDynamicParameter.ID {
+        switch s {
+        case "HapticIntensityControl":   return .hapticIntensityControl
+        case "HapticSharpnessControl":   return .hapticSharpnessControl
+        case "HapticAttackTimeControl":  return .hapticAttackTimeControl
+        case "HapticDecayTimeControl":   return .hapticDecayTimeControl
+        case "HapticReleaseTimeControl": return .hapticReleaseTimeControl
+        default: throw apiError("Unknown parameter '\(s)'")
+        }
     }
 
     private static func apiError(_ msg: String) -> NSError {

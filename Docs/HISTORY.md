@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-05-22 — Haptic Phase A: two-player architecture + per-cat rhythm
+
+### What landed
+The v0 haptic codepath is gone. Replaced by:
+
+- **Engine kept warm** — `isAutoShutdownEnabled = false`, `playsHapticsOnly = true`, `stoppedHandler` and `resetHandler` recover from system events. No stop/restart "to refresh" dance.
+- **Two named looped players** running simultaneously when a kitten plays:
+  - `purr` — continuous events sliced over one breath cycle, with a `CHHapticParameterCurve` baking the inhale/exhale envelope straight into the pattern. `loopEnabled = true`, `loopEnd = breathPeriodSec`.
+  - `heartbeat` — transient lub-dub at S1 + S1+0.080s, `loopEnd = 60 / heartRateBPM`.
+- **Third `api` player slot** for arbitrary patterns submitted via `/haptics/pattern` — the Phase B tuning surface.
+- **Per-kitten haptic profiles** from `CatHapticProfile`, built from the cat's measured audio plus research defaults.
+
+### Per-cat rhythm — extracted from the actual recordings
+`AudioAnalyzer` runs once at launch, off-main. Decodes each `.m4a` to PCM mono, computes a 50 Hz amplitude envelope, autocorrelates the envelope at 1.5–5 s lags for breath period, and autocorrelates raw PCM at 20–50 Hz lags for the purr fundamental (diagnostic only — the Taptic engine can't reproduce a frequency directly).
+
+Measured values on first run:
+
+| Cat | Purr fundamental | Breath cycle | Breath depth |
+|---|---|---|---|
+| Floozy | 28.9 Hz | 3.24 s | 0.76 |
+| Nacho  | 28.6 Hz | 1.70 s | 0.86 |
+| No-No! | 28.7 Hz | 2.36 s | 0.71 |
+
+All three purr fundamentals land in the research-stated 25–30 Hz band — the detector found real cat purrs, not noise. Floozy's 3.24 s breath cycle is right at the research-stated midpoint for a relaxed cat. **Nacho's 1.70 s is fast** — possibly real (animated cat in the recording), possibly the half-period harmonic. Phase B (Mark on chest) will tell us. If it feels fluttery, we widen the search-band minimum.
+
+### API additions
+- `GET /audio/analysis` — per-kitten analysis + resolved haptic profile
+- `GET /haptics/players` — supported / active / activePlayers / current intensity & sharpness
+- `POST /haptics/pattern` — now accepts `player` (defaults to `api`), `loop`, `loopEnd`
+- `POST /haptics/dynamic` — now accepts optional `player` (defaults to all active)
+- `POST /haptics/stop` — now accepts optional `player` (defaults to all)
+- Schema reconciliation: accept both `parameter`/`parameterID`, `controlPoints`/`keyframes`, `time`/`relativeTime`. Claude's proposal JSON works as-is.
+
+### Phase A QA (no Mark required) — all passed
+- 12 rapid kitten swaps in <2s → engine survives, lands cleanly, both players active
+- 6 s soak with five live `/haptics/dynamic` updates while patterns loop → intensity tracks, audio continues uninterrupted
+- Stop one named player → others survive
+- Stop all → every slot cleared
+- Bogus player name → 500 with explanatory error
+- Looped `api` pattern (Claude's keyframe-spelled JSON) accepted and runs alongside `purr`
+- Zero warnings introduced
+
+### What Phase A intentionally does NOT do
+- Tune the patterns. The defaults are Claude's research starters. Phase B happens with Mark lying down, phone on chest, CC driving live tweaks via `/haptics/dynamic` and `/haptics/pattern`. No haptic commit will be made without Mark's confirmation.
+- Address background/lock-screen behavior. The engine has the right handlers installed, but I can't confirm lock-screen behavior without Mark physically locking the phone. Needs verification when Mark comes back.
+
+### Files
+- New: `AudioAnalysis.swift` — file loading + RMS envelope + autocorrelation, defensive peak-ratio guard
+- New: `CatHapticProfile.swift` — per-kitten parameter struct + research defaults + builder from analysis
+- Rewritten: `AppState.swift` blocks 5–8 (engine lifecycle, cat patterns, named-player ops, audio analysis at launch). Blocks 1–4 (kitten model, properties, playback actions, timer) unchanged.
+- Extended: `LocalAPIServer.swift` (player names, loop, schema reconciliation, two new GET endpoints).
+
+---
+
 ## 2026-05-21 — Bundled audio corrected; Wi-Fi IP discovery fixed
 
 ### Wrong-audio bug fixed

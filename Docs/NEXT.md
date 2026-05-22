@@ -39,33 +39,25 @@ Connection details in CLAUDE.md (Build + Deploy and API connection sections). DE
 
 **Known v0 bug surfaced by the API**: `hapticsActive` returns `false` after `/play`, but `currentHapticIntensity` is updating. This means the v0 audio-sync timer fires but the haptic player itself never comes up cleanly. Confirmed pre-existing behavior — the haptic redesign in Step 3 is meant to replace this entirely.
 
-### Step 2 — Research Phase (Before Writing Haptic Code)
+### Step 2 — Research Phase ✅ DONE (Mark + Claude/claude.ai)
+Output: written brief on cat purr/breath/heart, CoreHaptics affordances, and a starter two-player architecture. See HISTORY.md 2026-05-22 for the per-cat measurements.
 
-Do not write haptic code until this is done.
+### Step 3 — Implement Layered Haptic Patterns ✅ Phase A DONE
+Two-player architecture (purr+breathing as one player with parameter curve, heartbeat as a second player), looped, per-kitten parameters from audio analysis. Engine kept warm. API extended for live tuning. All Phase A QA passed. See HISTORY.md 2026-05-22.
 
-Research needed:
-- Cat purr physiology: frequency range (25–50Hz), inhale/exhale variation, amplitude envelope
-- Breathing rate at rest: 4–6 second cycle, rise/fall shape
-- Cat heartbeat at rest: 120–140 BPM (cats have faster hearts than humans — verify)
-- CoreHaptics capabilities: can we do true 25Hz continuous? What are the engine limits?
-- CHHapticDynamicParameter for real-time intensity/sharpness updates (vs stop/restart)
-- Prior art: any open-source iOS haptic libraries worth reusing?
-- WWDC sessions on CoreHaptics design
+**Phase B — tuning with Mark on chest** is the next step:
+- Mark lies down, phone on chest, eyes closed
+- CC drives `/haptics/dynamic` and `/haptics/pattern` live based on Mark's feedback
+- Iterate per kitten until each one feels like itself
+- **No haptic commit lands without Mark's confirmation**
+- Open questions to resolve here:
+  - Does Nacho's measured 1.70 s breath cycle feel right, or do we widen the search minimum / pick the half-period peak?
+  - Is the heartbeat (s1=0.20 / s2=0.12) detectable under the purr (0.85), or do we need to dip the purr around each beat?
+  - 4-slice purr vs 1/2/8 slices — does the boundary articulation help or hurt?
+  - Per-cat heart rate variation (Floozy vs Nacho vs No-No!) — does it matter?
 
-Output: a written haptic pattern design (rhythm, frequency, layering approach) reviewed by Mark before any code.
-
-### Step 3 — Implement Layered Haptic Patterns
-
-Only after Step 2 design is approved.
-
-Target: three simultaneous layers
-1. Purr layer — primary, ~25Hz, rhythmic with inhale/exhale modulation
-2. Breathing layer — slow 4–6s rise/fall envelope modulating purr intensity
-3. Heartbeat layer — subtle double-pulse at ~120–140 BPM underlying the purr
-
-Each layer potentially different per kitten (Floozy may have had a different purr character than Nacho).
-
-Verification: Mark lies down, phone on chest, eyes closed. Does it feel like a cat?
+### Step 3.5 — Lock-screen + background verification (pending Mark)
+Engine handlers are installed (`stoppedHandler`/`resetHandler`) but lock-screen behavior is unverified. Mark to confirm whether audio + haptic continue under lock screen and resume on unlock. If not, may need `UIBackgroundModes` audio + audio session category review.
 
 ### Step 4 — Audio Loop Cleanup
 

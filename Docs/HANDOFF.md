@@ -41,11 +41,12 @@ Purr Machine makes your iPhone feel like a purring cat lying on your chest. Thre
 - **LocalAPIServer**: port 8767, verified end-to-end on Mark's iPhone 16 Plus over Wi-Fi (see HISTORY.md 2026-05-21). DEBUG antenna toggle + alert dialog + clipboard + Documents file.
 - **AppState extraction**: ViewController is now a thin view over `AppState.shared`. UI behavior unchanged.
 - **Bundled audio**: corrected — Floozy/Nacho/No-No! now each play their own real recording (see HISTORY.md 2026-05-21).
+- **Haptic Phase A**: two-player architecture (purr+breathing as one looped player with parameter curve; heartbeat as a second looped player). Per-cat breath cycles measured from each recording via autocorrelation. Engine kept warm. API extended (named players, loop, schema reconciliation). All Phase A QA passed. See HISTORY.md 2026-05-22.
 
 ## What Is Not Done (in priority order)
 
-1. **Mark listens to confirm No-No! take #2 is the right one** (vs #1 or #3) — trivial swap if not
-2. **Haptic research** — cat physiology + CoreHaptics capabilities
+1. **Mark listens to confirm No-No! take #2 is the right recording** (vs #1 or #3)
+2. **Haptic Phase B — tuning with Mark on chest.** Drive `/haptics/dynamic` + `/haptics/pattern` live based on Mark's feedback. No haptic commit without his confirmation.
 3. **Haptic pattern design** — written design reviewed by Mark before code
 4. **Layered haptic implementation** — purr + breathing + heartbeat simultaneously
 5. **Audio loop verification** — check for click artifacts at loop points
