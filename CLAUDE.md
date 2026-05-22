@@ -220,20 +220,32 @@ Event fields accepted by `/haptics/pattern`: `type` (`continuous`/`transient`), 
 ## Project Structure
 
 ```
-Purr Machine/
-├── ViewController.swift     — All UI and logic (single-file for now)
-├── AppDelegate.swift
-├── SceneDelegate.swift
-├── Purr1.m4a               — Floozy recording (Mark's parents' cat)
-├── Purr2.m4a               — Nacho recording (Heather's cat, Atlanta)
-├── Purr3.m4a               — No-No! recording (Heather's cat, passed)
-└── Assets.xcassets/        — App icon (meditating cat, already done)
-
-Docs/
-├── CLAUDE.md               — This file
-├── NEXT.md                 — Current state and immediate next steps
-├── HISTORY.md              — Chronicle of all work
-└── HANDOFF.md              — State preservation for context loss
+Purr-Machine/                  ← repo root
+├── CLAUDE.md                  — this file
+├── NEXT.md                    — current state and immediate next steps
+├── HISTORY.md                 — chronicle of all work
+├── HANDOFF.md                 — state preservation for context loss
+├── README.md                  — GitHub repo blurb
+├── Purr Machine/              — Xcode project root
+│   ├── Purr Machine.xcodeproj
+│   └── Purr Machine/
+│       ├── AppState.swift     — single source of truth (@MainActor)
+│       ├── AudioAnalysis.swift— per-cat rhythm extraction
+│       ├── CatHapticProfile.swift — per-kitten haptic params
+│       ├── LocalAPIServer.swift   — HTTP/JSON API on port 8767
+│       ├── SceneDelegate.swift
+│       ├── ViewController.swift   — thin view over AppState
+│       ├── Info.plist
+│       ├── Purr1/2/3.m4a      — production audio (processed)
+│       ├── face_floozy/nacho/nono.png — vignetted face crops
+│       └── Assets.xcassets/   — app icon (meditating cat)
+├── Audio kitty purrs/         — archive of source recordings
+├── Images kitty avatars/      — archive of source portraits
+├── Scripts/
+│   └── process_audio.sh       — ffmpeg loop+normalize pipeline
+├── Screenshots/               — App Store screenshots (Mark captures)
+└── docs/                      — GitHub Pages site (index/privacy/support)
+    └── assets/
 ```
 
 ---

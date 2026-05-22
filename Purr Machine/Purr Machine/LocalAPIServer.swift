@@ -1,6 +1,12 @@
 // LocalAPIServer.swift
 // Purr Machine
 //
+// DEBUG-ONLY: the entire file is compiled out of Release builds. App Store
+// binaries do not contain the LocalAPIServer type, the NWListener, the
+// Keychain token logic, or any of the route handlers. All callers
+// (ViewController's antenna toggle) are also `#if DEBUG`-gated, so there
+// are no broken references in Release.
+//
 // Local HTTP/JSON API for Purr Machine. NWListener-based, bearer-token auth,
 // no dependencies. Modeled on the Hal Universal LocalAPIServer pattern.
 //
@@ -25,6 +31,8 @@
 //   POST /haptics/stop           — stop haptics only, leave audio playing
 //
 // All mutating endpoints return the new /state snapshot.
+
+#if DEBUG
 
 import Foundation
 import Network
@@ -584,3 +592,5 @@ extension LocalAPIServer {
     }
 }
 // ========== BLOCK 5: LocalAPIServer - haptic pattern decoding - END ==========
+
+#endif // DEBUG — entire file is compiled out of Release
