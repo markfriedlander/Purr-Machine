@@ -19,6 +19,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidDisconnect(_ scene: UIScene) {}
     func sceneDidBecomeActive(_ scene: UIScene) {}
     func sceneWillResignActive(_ scene: UIScene) {}
-    func sceneWillEnterForeground(_ scene: UIScene) {}
+
+    /// iOS won't let CHHapticEngine play under the lock screen — that's
+    /// system policy. Audio continues thanks to UIBackgroundModes=audio,
+    /// but the haptic engine is stopped on suspend. The instant we come
+    /// back to the foreground, restart it so the felt purr is there when
+    /// the user looks at the phone.
+    func sceneWillEnterForeground(_ scene: UIScene) {
+        Task { @MainActor in
+            AppState.shared.resumeHapticsForForegroundIfNeeded()
+        }
+    }
+
     func sceneDidEnterBackground(_ scene: UIScene) {}
 }

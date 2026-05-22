@@ -87,6 +87,12 @@ extension ViewController {
             b.layer.cornerRadius = 10
             b.tag = kitten.rawValue
             b.addTarget(self, action: #selector(kittenButtonTapped(_:)), for: .touchUpInside)
+            // Lock height so the 24pt-regular ↔ 26pt-bold swap on activation
+            // can't change the button's intrinsic height. In landscape the
+            // kitten buttons are a horizontal row whose height = tallest
+            // button, so without this any font-weight change would resize
+            // the row and re-center the whole layout (visible as a jump).
+            b.heightAnchor.constraint(equalToConstant: 50).isActive = true
             return b
         }
 
@@ -102,14 +108,17 @@ extension ViewController {
         timerButton.titleLabel?.font = UIFont.systemFont(ofSize: 22, weight: .regular)
         timerButton.layer.cornerRadius = 10
         timerButton.addTarget(self, action: #selector(timerButtonTapped), for: .touchUpInside)
+        timerButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
 
-        // Face image — reserves its space at all times (alpha starts at 0)
-        // so kitten taps fade the face in without shifting the buttons.
-        // Black-on-black: the vignette's edge falls off to pure black against
-        // the app's black background, making the face appear to materialize.
+        // Face image. Starts collapsed (isHidden = true) so the buttons sit
+        // centered when no kitten is selected. On selection the stack animates
+        // the face into existence above the buttons, which naturally slides
+        // them down. Black-on-black: the vignette falls off to pure black
+        // against the app's background, making the face appear to materialize.
         faceImageView = UIImageView()
         faceImageView.contentMode = .scaleAspectFit
         faceImageView.alpha = 0
+        faceImageView.isHidden = true
         faceImageView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             faceImageView.widthAnchor.constraint(equalToConstant: Self.faceWidth),
@@ -127,17 +136,30 @@ extension ViewController {
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(mainStackView)
 
+        // View-relative widths for the kitten stack and the timer button.
+        // We deliberately do NOT pin these to mainStackView.widthAnchor —
+        // that creates a circular dependency (with alignment=.center the
+        // outer stack tries to size to its children, which try to size to
+        // the outer stack) and lets intrinsic content sizes (font weight!)
+        // leak into the layout. Pinning to the view's width is independent
+        // of any text content, so a tap that bolds a kitten name cannot
+        // ripple out into the surrounding layout.
+        //
+        // Each gets the smaller of (view width - 40) or `widthMax`. The
+        // view-relative ceiling adapts to small phones; the absolute cap
+        // keeps things sane on wide landscape iPhones and iPads.
+        let widthMax: CGFloat = 360
         NSLayoutConstraint.activate([
             mainStackView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             mainStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            mainStackView.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40),
-            // The kitten button stack should still span the available width
-            // so each button has its own row in portrait. Without this the
-            // stack would collapse to its intrinsic content size because of
-            // mainStackView.alignment = .center.
-            stackView.widthAnchor.constraint(equalTo: mainStackView.widthAnchor),
-            timerButton.widthAnchor.constraint(equalTo: mainStackView.widthAnchor),
         ])
+        for v in [stackView!, timerButton!] {
+            let widthEqual = v.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -40)
+            widthEqual.priority = .defaultHigh
+            let widthCap = v.widthAnchor.constraint(lessThanOrEqualToConstant: widthMax)
+            widthCap.priority = .required
+            NSLayoutConstraint.activate([widthEqual, widthCap])
+        }
 
         #if DEBUG
         buildAPIToggleButton()
@@ -270,17 +292,23 @@ extension ViewController {
     }
 
     /// Drive the face image from the current selection. Three cases:
-    ///   * nil           → fade to alpha 0, clear image when done
-    ///   * same kitten   → no-op (avoid re-running the fade on every tick)
-    ///   * new kitten    → cross-dissolve image and fade alpha to 1 in one
-    ///                     animation block, so a switch flows like a memory
-    ///                     replacing a memory (Mark's word)
+    ///   * nil               → fade out + collapse from stack (buttons slide
+    ///                          back to vertically-centered position)
+    ///   * first selection   → fade in + expand into stack (buttons slide
+    ///                          down to make room — Mark's ask)
+    ///   * switching kittens → just cross-dissolve the image; buttons stay
+    ///                          put because the face is already in the stack
     private func updateFaceImage(for kitten: Kitten?) {
         guard let kitten else {
-            guard faceImageView.alpha > 0 else { return }
+            // No selection. If face is already collapsed, nothing to do.
+            guard !faceImageView.isHidden else { return }
             UIView.animate(withDuration: Self.faceFadeDuration, delay: 0,
                            options: [.curveEaseInOut, .beginFromCurrentState],
-                           animations: { self.faceImageView.alpha = 0 },
+                           animations: {
+                               self.faceImageView.alpha = 0
+                               self.faceImageView.isHidden = true
+                               self.view.layoutIfNeeded()
+                           },
                            completion: { _ in
                                if self.state.currentlyPlaying == nil {
                                    self.faceImageView.image = nil
@@ -289,14 +317,28 @@ extension ViewController {
             return
         }
         let newImage = UIImage(named: faceAsset(for: kitten))
-        // Already showing this exact image at full alpha — leave it alone.
+        if faceImageView.isHidden {
+            // First-time appearance: set the image, then animate the slide-
+            // down + fade-in together in one block so the timing is unified.
+            faceImageView.image = newImage
+            UIView.animate(withDuration: Self.faceFadeDuration, delay: 0,
+                           options: [.curveEaseInOut, .beginFromCurrentState],
+                           animations: {
+                               self.faceImageView.alpha = 1
+                               self.faceImageView.isHidden = false
+                               self.view.layoutIfNeeded()
+                           },
+                           completion: nil)
+            return
+        }
+        // Already in the stack — switching cats. Don't move the layout;
+        // just cross-dissolve the image content. Memories replacing memories.
         if faceImageView.image === newImage && faceImageView.alpha >= 1 { return }
         UIView.transition(with: faceImageView,
                           duration: Self.faceFadeDuration,
                           options: [.transitionCrossDissolve, .curveEaseInOut, .beginFromCurrentState],
                           animations: {
                               self.faceImageView.image = newImage
-                              self.faceImageView.alpha = 1
                           },
                           completion: nil)
     }

@@ -316,7 +316,7 @@ extension AppState {
             engine.stoppedHandler = { reason in
                 print("AppState: haptic engine stopped — reason=\(reason.rawValue)")
                 Task { @MainActor in
-                    AppState.shared.handleEngineStopped()
+                    AppState.shared.handleEngineStopped(reason: reason)
                 }
             }
             engine.resetHandler = {
@@ -350,15 +350,38 @@ extension AppState {
         return hapticsEngine
     }
 
-    /// Called from the engine's stoppedHandler (on a background thread, hopped
-    /// to main). Tear down the player references since they're no longer valid.
-    fileprivate func handleEngineStopped() {
+    /// Called from the engine's stoppedHandler. Tears down player references
+    /// (they're invalid after the engine stops) and posts a state change.
+    ///
+    /// Note on background haptics: iOS does NOT permit CHHapticEngine to
+    /// play with the screen locked or the app backgrounded. This is a
+    /// system-level restriction (see Apple docs for
+    /// `CHHapticEngine.StoppedReason.applicationSuspended`). We get audio
+    /// background playback via `UIBackgroundModes = audio`, but the haptic
+    /// engine stops the moment we suspend and cannot be restarted until
+    /// the app returns to the foreground. The foreground transition is
+    /// handled by `resumeHapticsForForegroundIfNeeded()` below.
+    fileprivate func handleEngineStopped(reason: CHHapticEngine.StoppedReason) {
         purrPlayer      = nil
         heartbeatPlayer = nil
         apiPlayer       = nil
-        // Engine instance is kept; CHHapticEngine.start() will revive it on
-        // next demand.
         notifyChange()
+    }
+
+    /// Call when the app returns to the foreground. If a kitten is still
+    /// playing (audio kept going under lock thanks to UIBackgroundModes),
+    /// restart the haptic engine and rebuild patterns so the felt purr is
+    /// back the instant the user looks at the phone.
+    func resumeHapticsForForegroundIfNeeded() {
+        guard let k = currentlyPlaying else { return }
+        guard purrPlayer == nil && heartbeatPlayer == nil else { return }
+        do {
+            try hapticsEngine?.start()
+            startCatHapticsInternal(for: k)
+            print("AppState: haptics resumed on foreground")
+        } catch {
+            print("AppState: haptic resume on foreground failed: \(error)")
+        }
     }
 
     /// Called from the engine's resetHandler. Restart the engine and rebuild
