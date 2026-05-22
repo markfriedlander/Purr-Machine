@@ -100,10 +100,10 @@ final class AppState {
     private(set) var audioAnalysisByKitten: [Kitten: CatAudioAnalysis] = [:]
     private(set) var profilesByKitten: [Kitten: CatHapticProfile] = [:]
 
-    /// Resolves the profile for a kitten, falling back to research defaults
-    /// until analysis completes (early in launch).
+    /// Resolves the profile for a kitten, falling back to per-kitten
+    /// defaults until analysis completes (early in launch).
     func profile(for k: Kitten) -> CatHapticProfile {
-        profilesByKitten[k] ?? .researchDefaults
+        profilesByKitten[k] ?? .defaultFor(k)
     }
 
     // --- Haptics ---
@@ -595,10 +595,10 @@ extension AppState {
     /// are merged with research defaults into per-kitten haptic profiles.
     /// Analysis is launch-time only — these files don't change at runtime.
     fileprivate func kickOffAudioAnalysis() {
-        // Seed profiles with defaults so anything that asks before analysis
-        // completes still gets a usable answer.
+        // Seed profiles with per-kitten defaults so anything that asks before
+        // analysis completes still gets a usable, cat-appropriate answer.
         for k in Kitten.allCases {
-            profilesByKitten[k] = .researchDefaults
+            profilesByKitten[k] = .defaultFor(k)
         }
         Task.detached(priority: .userInitiated) {
             // Sendable: enum + struct of primitives.
@@ -615,7 +615,7 @@ extension AppState {
     fileprivate func applyAnalyses(_ pairs: [(Kitten, CatAudioAnalysis?)]) {
         for (k, a) in pairs {
             audioAnalysisByKitten[k] = a
-            profilesByKitten[k] = .from(a)
+            profilesByKitten[k] = .from(a, kitten: k)
             if let a { print("AudioAnalysis: \(a.summary)") }
             else     { print("AudioAnalysis: [\(k.displayName)] no result — defaults") }
         }

@@ -45,16 +45,12 @@ Output: written brief on cat purr/breath/heart, CoreHaptics affordances, and a s
 ### Step 3 — Implement Layered Haptic Patterns ✅ Phase A DONE
 Two-player architecture (purr+breathing as one player with parameter curve, heartbeat as a second player), looped, per-kitten parameters from audio analysis. Engine kept warm. API extended for live tuning. All Phase A QA passed. See HISTORY.md 2026-05-22.
 
-**Phase B — tuning with Mark on chest** is the next step:
+**Phase B — Mark feels the patterns** is the next step:
 - Mark lies down, phone on chest, eyes closed
-- CC drives `/haptics/dynamic` and `/haptics/pattern` live based on Mark's feedback
-- Iterate per kitten until each one feels like itself
-- **No haptic commit lands without Mark's confirmation**
-- Open questions to resolve here:
-  - Does Nacho's measured 1.70 s breath cycle feel right, or do we widen the search minimum / pick the half-period peak?
-  - Is the heartbeat (s1=0.20 / s2=0.12) detectable under the purr (0.85), or do we need to dip the purr around each beat?
-  - 4-slice purr vs 1/2/8 slices — does the boundary articulation help or hurt?
-  - Per-cat heart rate variation (Floozy vs Nacho vs No-No!) — does it matter?
+- Try each kitten in turn — does each feel like that cat?
+- One round of feedback per cat. Mark says what's wrong; CC re-tunes; install; Mark feels again.
+- **No haptic commit lands without Mark's confirmation.**
+- CC has already taken its best swings on the obvious issues (see HISTORY.md 2026-05-22 Phase A.2). What remains is what only a body on a chest can answer.
 
 ### Step 3.5 — Lock-screen + background verification (pending Mark)
 Engine handlers are installed (`stoppedHandler`/`resetHandler`) but lock-screen behavior is unverified. Mark to confirm whether audio + haptic continue under lock screen and resume on unlock. If not, may need `UIBackgroundModes` audio + audio session category review.

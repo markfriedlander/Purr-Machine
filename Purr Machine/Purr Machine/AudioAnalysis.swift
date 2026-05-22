@@ -169,8 +169,11 @@ extension AudioAnalyzer {
         var de = env
         for k in 0..<de.count { de[k] -= mean }
 
-        // Lag range: 1.5 s .. 5.0 s → envelope-sample range:
-        let minLag = Int(envHz * 1.5)
+        // Lag range: 2.0 s .. 5.0 s → envelope-sample range.
+        // 2.0 s = 30 breaths/min, the upper end of cat-resting breath rate.
+        // The lower bound deliberately excludes half-period harmonics that
+        // can be stronger than the fundamental in noisy short recordings.
+        let minLag = Int(envHz * 2.0)
         let maxLag = min(Int(envHz * 5.0), de.count / 2)
         guard maxLag > minLag + 5 else { return (nil, nil) }
 

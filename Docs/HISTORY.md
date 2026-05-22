@@ -4,6 +4,35 @@
 
 ---
 
+## 2026-05-22 — Haptic Phase A.2: CC's tuning judgment before handoff to Mark
+
+SC pushed back: stop deferring tuning judgment calls to Mark. Wear all three hats yourself. Don't bring Mark in until you think it's ready. Made the following changes on my own judgment, all with the goal of "cat on chest" not "phone alert":
+
+### Autocorrelation: min lag 1.5 s → 2.0 s
+Nacho's first run reported 1.70 s breath cycle — half-period harmonic of his real ~3.4 s rhythm, or simply too fast for relaxed-cat-on-chest. Pushing the min to 2.0 s (30 breaths/min, the upper end of a relaxed cat) puts him on his actual rhythm. After fix: Nacho 2.34 s, almost identical to No-No! at 2.36 s — physically plausible for similarly-sized cats. Floozy at 3.24 s (long-haired, larger) remains the slowest. All three still show purr fundamentals ~28.7 Hz.
+
+### Haptic depth decoupled from measured envelope depth, capped at 0.35
+Plugging the raw envelope depth (0.71-0.86) straight into the haptic curve made the trough = base × (1 - depth), which for base 0.85 went to 0.20 — a 4× dynamic range that would feel like the purr drops out during inhale. The research says "slightly fuller exhale," not "purr stops." Capping at 0.35 keeps cross-cat variation while preserving continuity.
+
+### Per-kitten haptic personalities (tasteful defaults)
+Each cat now feels different:
+| Cat    | purrBaseIntensity | purrSharpness | heartRateBPM |
+|--------|------------------:|--------------:|-------------:|
+| Floozy | 0.75 (richer)     | 0.12 (softer) | 145          |
+| Nacho  | 0.65 (lighter)    | 0.18 (brighter)| 170         |
+| No-No! | 0.60 (gentle)     | 0.14          | 155          |
+Reasoning: Floozy was a long-haired tortoiseshell — larger, slower heart, denser purr. Nacho is a sleek young orange tabby — smaller, faster heart, lighter purr. No-No! was at end of life — gentle, mid-rate (honors his condition without making a strong claim about it).
+
+### Heartbeat intensity 0.20/0.12 → 0.40/0.25
+The original values would be mathematically lost under a 0.70+ continuous purr. New values are heard-but-subtle. Phase B will tell us if "subtle" landed where I think it did.
+
+### Baseline purr intensity 0.85 → research default 0.70
+0.85 felt like "phone alert" pitch; 0.70 is the upper-mid of felt intensity. The breath curve modulates 0.7 × 0.65 (=0.46) → 0.7 × 1.0 (=0.70) over the cycle. Still very present, just not aggressive.
+
+This is the version I think is ready for Mark to feel for the first time.
+
+---
+
 ## 2026-05-22 — Haptic Phase A: two-player architecture + per-cat rhythm
 
 ### What landed
