@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-05-22 — Submitted to App Store Connect for review 🎉
+
+Purr Machine 1.0 (1) is in Apple's review queue. ETA: up to 48 hours.
+
+**What shipped:**
+- Bundle ID: `com.HeatherAndMark.PurrMachine.Purr-Machine`
+- Name: Purr Machine
+- Subtitle: "Purr. Breathe. Calm. Sleep." (sibling cadence to Pure Phase)
+- Category: Health & Fitness / Lifestyle
+- Age rating: 4+
+- Price: Free, no IAP, no subscription
+- Distribution: iPhone only (Mac and Vision Pro deliberately unchecked — they lack a Taptic engine)
+- Availability: All Countries or Regions (Apple's non-trader auto-exclusion handles DSA / EU)
+- Privacy: Data Not Collected
+- Encryption: None — exempt
+- Regulated medical device: No (required declaration because category is Health & Fitness)
+- Marketing / Support / Privacy URLs all point at https://markfriedlander.github.io/Purr-Machine/
+
+**The road there:**
+Submission was driven via the Chrome MCP tools from CC's side while Mark uploaded the screenshots manually from Safari (the file-upload tool doesn't allow paths outside the session's blessed directories). Apple's review form had several gotchas worth remembering for next time:
+
+1. Content Rights declaration must be redone if any "force navigate" discards unsaved changes — happened to us once on the App Information page, costing one round-trip.
+2. Pricing has *three* separate switches (price tier, app availability, distribution methods) plus per-platform sub-checkboxes for Apple Silicon Mac and Vision Pro that default to ON.
+3. The medical-device declaration is conditional on having a Health & Fitness category — surfaces only after the initial Add-for-Review click.
+4. Initial 1290×2796 screenshots from iPhone 16 Plus needed resizing to 1242×2688 to upload into ASC's 6.5" Display slot. Aspect ratios (1:2.167 vs 1:2.164) are close enough that the distortion is imperceptible. `sips -z 2688 1242 src.jpeg --out dest.jpeg` is the one-liner.
+5. Phone number required for App Review contact info (private to Apple — never shown on the public listing).
+6. DSA non-trader status on the developer account auto-excludes EU/EEA distribution; the "175 countries" Pricing display is misleading because Apple applies the non-trader filter server-side at submit time, not in the UI.
+
+---
+
 ## 2026-05-22 — Phase B feedback round 1: intensity bump + audio processing
 
 Mark felt the haptic for the first time. Report: "felt pretty great! relaxing and bringing up all kinds of happy memories." No-No!'s is the favorite — partly the better audio quality of her recording, partly her bell jingling, which is preserved and irreplaceable. All three were "a little more subtle" than he wanted, and rhythm changes were "hard to feel."

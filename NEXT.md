@@ -4,28 +4,29 @@
 
 ---
 
-## Current State
+## Current State — Submitted for App Store Review
 
-Project has working v0 code in a single `ViewController.swift`. Core loop functional:
-- Three kitten buttons (Floozy / Nacho / No-No!) → audio playback → haptics → sleep timer
-- Sleep timer cycles through 10min / 20min / 30min / ∞
-- Basic haptic sync attempt (ramps intensity with audio position)
-- App icon complete (meditating cat, already in Assets)
-- GitHub repo created: https://github.com/markfriedlander/Purr-Machine
-- Local path: `/Users/markfriedlander/Desktop/Fun/Purr Machine`
+**Purr Machine 1.0 (1) is in Apple's review queue as of 2026-05-22 ~4:51 PM PT.** ETA up to 48 hours; Mark will get email when review completes. See HISTORY.md for full submission details.
 
-**What's not working yet:**
-- Haptics don't feel like a cat — single continuous buzz, no rhythm, stops/restarts every 0.25s causing stutter
-- No layered rhythms (purr + breathing + heartbeat)
-- Audio loops may have click artifacts at loop points (not yet verified)
-- ViewController has LEGO block structure now; the rest of the app does not yet (only AppState + LocalAPIServer + ViewController are blocked)
+Marketing site live at https://markfriedlander.github.io/Purr-Machine/.
 
-**Now working:**
-- LocalAPIServer on port 8767 — full API for read/control, including arbitrary CHHapticPattern submission. State extracted into `AppState` (single source of truth). UI behavior unchanged.
+Local path: `/Users/markfriedlander/Desktop/Fun/Purr Machine`.
+
+**The app, as shipped:**
+- Three real cats (Floozy/Nacho/No-No!) with their actual recordings, seamlessly looped with equal-power crossfade
+- Per-cat haptic profiles drawn from each recording's measured breath cycle (autocorrelation); per-cat heart rate, purr intensity, sharpness
+- Two-player CoreHaptics architecture (purr + heartbeat) running simultaneously
+- Vignetted face crops fade in above the kitten buttons on selection
+- Sleep timer (10/20/30/∞); audio continues under lock; haptic resumes on unlock
+- LocalAPIServer compiled out of Release
+- iPhone only; no data collection; no subscription; free
 
 ---
 
 ## Immediate Next Steps — In Order
+
+### Step 0 — Wait for Apple Review (in progress)
+Submitted 2026-05-22 ~4:51 PM PT. ETA up to 48 hours. Mark gets email when complete. If Apple rejects, address feedback and resubmit. If approved, decide manual vs automatic release.
 
 ### Step 1 — Establish the API ✅ DONE (verified on Mark's iPhone 16 Plus, 2026-05-21)
 
@@ -64,15 +65,16 @@ If there are artifacts, address at the audio level — do not process or alter t
 
 Refactor into clearly bounded blocks before the file grows further. Do not change behavior — structural only.
 
-### Step 6 — App Store Prep
+### Step 6 — App Store Prep ✅ DONE 2026-05-22
 
-- Privacy policy page
-- Support page  
-- App Store screenshots
-- App description / metadata
-- Version bump
-- Clean Release build (zero warnings)
-- Archive + submit
+- Privacy policy page ✅ at https://markfriedlander.github.io/Purr-Machine/privacy.html
+- Support page ✅ at https://markfriedlander.github.io/Purr-Machine/support.html
+- Marketing index page ✅ at https://markfriedlander.github.io/Purr-Machine/
+- App Store screenshots ✅ (3 captured, resized to 1242×2688)
+- App description / metadata ✅ submitted
+- Clean Release build (zero warnings) ✅
+- Archive + upload ✅ via Xcode Organizer
+- Submit for Review ✅ in Apple's queue
 
 ---
 
