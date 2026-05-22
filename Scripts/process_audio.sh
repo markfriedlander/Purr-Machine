@@ -20,8 +20,13 @@
 #   4. loudnorm               — final loudness normalization to a target
 #                              perceived level (-18 LUFS, podcast-ish)
 #   5. seamless loop crossfade — last 0.5s fades into a copy of the first
-#                              0.5s. When AVAudioPlayer loops the file the
-#                              seam is silent — no click, no gap
+#                              0.5s using an EQUAL-POWER curve (qsin —
+#                              quarter-sine). Linear/triangular crossfades
+#                              produce a -3dB dip at the midpoint when the
+#                              two signals are uncorrelated; qsin keeps the
+#                              combined energy constant so the seam is
+#                              inaudible even when tail and head have
+#                              different content (true for longer purrs).
 #   6. AAC encode @ 96kbps    — matches the source format; in-ear quality
 #
 # Originals in Audio kitty purrs/ are never written to. The processed files
@@ -74,7 +79,7 @@ ffmpeg -hide_banner -loglevel error -y \
         [0:a]atrim=0:${BODY_END}[body];
         [1:a]atrim=${BODY_END}:${DUR},asetpts=PTS-STARTPTS[tail];
         [2:a]atrim=0:${CROSSFADE},asetpts=PTS-STARTPTS[head];
-        [tail][head]acrossfade=d=${CROSSFADE}:c1=tri:c2=tri[xf];
+        [tail][head]acrossfade=d=${CROSSFADE}:c1=qsin:c2=qsin[xf];
         [body][xf]concat=n=2:v=0:a=1[out]
     " \
     -map "[out]" -ar 44100 -ac 1 -c:a pcm_s16le \
