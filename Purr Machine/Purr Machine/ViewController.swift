@@ -21,6 +21,10 @@ class ViewController: UIViewController {
     private var mainStackView: UIStackView!
     private var timerButton: UIButton!
     private var kittenButtons: [UIButton] = []
+    private var faceImageView: UIImageView!
+    private static let faceFadeDuration: TimeInterval = 0.6
+    private static let faceWidth: CGFloat = 130   // ~50% bigger than name text
+    private static let faceHeight: CGFloat = 130
 
     #if DEBUG
     private var apiToggleButton: UIButton!
@@ -99,9 +103,27 @@ extension ViewController {
         timerButton.layer.cornerRadius = 10
         timerButton.addTarget(self, action: #selector(timerButtonTapped), for: .touchUpInside)
 
-        mainStackView = UIStackView(arrangedSubviews: [stackView, timerButton])
+        // Face image — reserves its space at all times (alpha starts at 0)
+        // so kitten taps fade the face in without shifting the buttons.
+        // Black-on-black: the vignette's edge falls off to pure black against
+        // the app's black background, making the face appear to materialize.
+        faceImageView = UIImageView()
+        faceImageView.contentMode = .scaleAspectFit
+        faceImageView.alpha = 0
+        faceImageView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            faceImageView.widthAnchor.constraint(equalToConstant: Self.faceWidth),
+            faceImageView.heightAnchor.constraint(equalToConstant: Self.faceHeight),
+        ])
+
+        mainStackView = UIStackView(arrangedSubviews: [faceImageView, stackView, timerButton])
         mainStackView.axis = .vertical
-        mainStackView.spacing = 40
+        mainStackView.alignment = .center           // keep face centered when its
+                                                    // intrinsic width is smaller
+                                                    // than the buttons stack
+        mainStackView.spacing = 30                  // slightly tighter than the
+                                                    // previous 40 because the
+                                                    // face adds visual weight
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(mainStackView)
 
@@ -109,6 +131,12 @@ extension ViewController {
             mainStackView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             mainStackView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             mainStackView.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40),
+            // The kitten button stack should still span the available width
+            // so each button has its own row in portrait. Without this the
+            // stack would collapse to its intrinsic content size because of
+            // mainStackView.alignment = .center.
+            stackView.widthAnchor.constraint(equalTo: mainStackView.widthAnchor),
+            timerButton.widthAnchor.constraint(equalTo: mainStackView.widthAnchor),
         ])
 
         #if DEBUG
@@ -209,6 +237,7 @@ extension ViewController {
                 ? UIFont.systemFont(ofSize: 26, weight: .bold)
                 : UIFont.systemFont(ofSize: 24, weight: .regular)
         }
+        updateFaceImage(for: state.currentlyPlaying)
 
         let seconds = state.timerOptions[state.timerIndex]
         let title: String
@@ -227,3 +256,49 @@ extension ViewController {
     }
 }
 // ========== BLOCK 5: ViewController - state -> UI - END ==========
+
+// ========== BLOCK 7: ViewController - face fade - START ==========
+extension ViewController {
+
+    /// Bundle resource name (without extension) for each kitten's vignetted face.
+    private func faceAsset(for k: Kitten) -> String {
+        switch k {
+        case .floozy: return "face_floozy"
+        case .nacho:  return "face_nacho"
+        case .noNo:   return "face_nono"
+        }
+    }
+
+    /// Drive the face image from the current selection. Three cases:
+    ///   * nil           → fade to alpha 0, clear image when done
+    ///   * same kitten   → no-op (avoid re-running the fade on every tick)
+    ///   * new kitten    → cross-dissolve image and fade alpha to 1 in one
+    ///                     animation block, so a switch flows like a memory
+    ///                     replacing a memory (Mark's word)
+    private func updateFaceImage(for kitten: Kitten?) {
+        guard let kitten else {
+            guard faceImageView.alpha > 0 else { return }
+            UIView.animate(withDuration: Self.faceFadeDuration, delay: 0,
+                           options: [.curveEaseInOut, .beginFromCurrentState],
+                           animations: { self.faceImageView.alpha = 0 },
+                           completion: { _ in
+                               if self.state.currentlyPlaying == nil {
+                                   self.faceImageView.image = nil
+                               }
+                           })
+            return
+        }
+        let newImage = UIImage(named: faceAsset(for: kitten))
+        // Already showing this exact image at full alpha — leave it alone.
+        if faceImageView.image === newImage && faceImageView.alpha >= 1 { return }
+        UIView.transition(with: faceImageView,
+                          duration: Self.faceFadeDuration,
+                          options: [.transitionCrossDissolve, .curveEaseInOut, .beginFromCurrentState],
+                          animations: {
+                              self.faceImageView.image = newImage
+                              self.faceImageView.alpha = 1
+                          },
+                          completion: nil)
+    }
+}
+// ========== BLOCK 7: ViewController - face fade - END ==========
