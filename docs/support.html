@@ -127,9 +127,12 @@
       border-top: 1px solid var(--border);
       font-size: 0.85rem;
       color: var(--muted);
+      text-align: center;
+      line-height: 1.9;
     }
-    footer a { color: var(--muted); }
-    footer a:hover { color: var(--accent); }
+    footer a { color: var(--accent); }
+    footer a:hover { color: var(--accent-glow); text-decoration: underline; }
+    footer .sep { color: var(--border); padding: 0 0.4rem; }
 
     @media (max-width: 480px) {
       body { padding: 2rem 1rem 4rem; }
@@ -212,10 +215,7 @@
     </p>
 
     <footer>
-      <p>Purr Machine 1.0 — May 2026 &nbsp;·&nbsp;
-         <a href="privacy.html">Privacy</a> &nbsp;·&nbsp;
-         <a href="index.html">Home</a> &nbsp;·&nbsp;
-         © 2026 Mark Friedlander</p>
+      <a href="https://apps.apple.com/us/app/purr-machine/id6772356141">App Store</a><span class="sep">·</span><a href="privacy.html">Privacy</a><span class="sep">·</span><a href="support.html">Support</a><span class="sep">·</span><a href="https://github.com/markfriedlander/Purr-Machine">Source</a><span class="sep">·</span><a href="index.html">Home</a><span class="sep">·</span>© 2026 <a href="https://markfriedlander.github.io/">Mark Friedlander</a>
     </footer>
 
   </main>
